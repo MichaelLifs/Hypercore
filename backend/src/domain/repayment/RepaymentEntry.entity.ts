@@ -1,10 +1,19 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
 import { Loan } from '../loan/Loan.entity';
 import type { PaymentType } from './paymentTypes';
 
 export type { PaymentType };
 
 @Entity('repayment_entries')
+@Index('idx_repayment_loan_seq', ['loanId', 'sequenceNumber'])
+@Unique('uq_repayment_loan_seq', ['loanId', 'sequenceNumber'])
 export class RepaymentEntry {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

@@ -1,6 +1,7 @@
 import { parsePrimeRateCsv } from '../domain/prime-rate/PrimeRateFetcher';
 
 const HEADER = 'DATE,PRIME';
+const HEADER_OBSERVATION_DATE = 'observation_date,PRIME';
 
 describe('parsePrimeRateCsv', () => {
   it('parses a well-formed CSV into chronological segments', () => {
@@ -29,7 +30,13 @@ describe('parsePrimeRateCsv', () => {
   it('converts percentage to decimal fraction', () => {
     const csv = [HEADER, '2024-01-01,8.5'].join('\n');
     const [seg] = parsePrimeRateCsv(csv);
-    // 8.5% → 0.085; use toBeCloseTo to tolerate IEEE-754 representation
+    expect(seg.annualRate).toBeCloseTo(0.085, 10);
+  });
+
+  it('accepts FRED observation_date column header (current CSV export)', () => {
+    const csv = [HEADER_OBSERVATION_DATE, '2024-01-01,8.5'].join('\n');
+    const [seg] = parsePrimeRateCsv(csv);
+    expect(seg.effectiveFrom).toBe('2024-01-01');
     expect(seg.annualRate).toBeCloseTo(0.085, 10);
   });
 

@@ -5,10 +5,22 @@ import { Modal } from '../../components/Modal';
 import { Button } from '../../components/Button';
 import { CREATE_LOAN } from '../../graphql/operations/loans';
 
+interface RateSegmentSnapshot {
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  annualRate: number;
+}
+
 interface InitialValues {
   principal?: string;
   startDate?: string;
   endDate?: string;
+  /**
+   * Optional rate snapshot returned by `simulateLoan`. When present, it is
+   * passed through to the mutation so the persisted schedule exactly matches
+   * the preview the user saw — even if FRED has since updated.
+   */
+  rateSegments?: RateSegmentSnapshot[];
 }
 
 interface NewLoanModalProps {
@@ -101,6 +113,13 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
     }
     setFieldErrors({});
     try {
+      const seededSegments = initialValues?.rateSegments;
+      const matchesSeed =
+        seededSegments !== undefined &&
+        form.startDate === initialValues?.startDate &&
+        form.endDate === initialValues?.endDate &&
+        Number(String(form.principal).replace(/,/g, '')) === Number(initialValues?.principal);
+
       await createLoan({
         variables: {
           input: {
@@ -108,6 +127,7 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
             principal: Number(String(form.principal).replace(/,/g, '')),
             startDate: form.startDate,
             endDate: form.endDate,
+            ...(matchesSeed ? { rateSegments: seededSegments } : {}),
           },
         },
       });
@@ -115,7 +135,6 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
       setFieldErrors({});
       onCreated();
     } catch {
-      // error rendered below from `error` state
     }
   };
 

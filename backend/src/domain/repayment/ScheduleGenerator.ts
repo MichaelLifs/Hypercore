@@ -30,19 +30,29 @@ function assertRateSegmentValues(segments: RateSegment[]): void {
   }
 }
 
+/**
+ * Binary search for the rate segment that applies on `asOf`.
+ *
+ * Assumes `segments` is sorted strictly ascending by `effectiveFrom` (validated
+ * once in `generateSchedule` before this is ever called).
+ */
 function annualRateOn(segments: RateSegment[], asOf: string): number {
-  let best: RateSegment | null = null;
-  for (const s of segments) {
-    if (compareIso(s.effectiveFrom, asOf) <= 0) {
-      if (!best || compareIso(s.effectiveFrom, best.effectiveFrom) > 0) {
-        best = s;
-      }
+  let lo = 0;
+  let hi = segments.length - 1;
+  let bestIdx = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (compareIso(segments[mid].effectiveFrom, asOf) <= 0) {
+      bestIdx = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
     }
   }
-  if (!best) {
+  if (bestIdx === -1) {
     throw new RangeError(`No rate segment covers date ${asOf}`);
   }
-  return best.annualRate;
+  return segments[bestIdx].annualRate;
 }
 
 /** Month-end coupon dates L with start < L < end (strict). */
@@ -72,6 +82,27 @@ function monthEndCouponsBetween(start: string, end: string): string[] {
   return out;
 }
 
+/**
+ * Interest accrued over [accrualStart, accrualEnd] INCLUSIVELY, splitting the
+ * period at each rate change so the correct rate applies to each strip.
+ *
+ * Additivity strategy (guaranteed by construction, no compensating deltas):
+ *   - Every intermediate sub-strip [cᵢ₋₁, cᵢ) is measured half-open via
+ *     `dayCount30360Raw` WITHOUT the Feb-maturity option; applying that
+ *     option to a sub-strip would break additivity because the adjustment
+ *     belongs to the inclusive closing of the final strip.
+ *   - The final sub-strip [cₖ, accrualEnd] is measured inclusively via
+ *     `dayCount30360` WITH the loan maturity option, so the ISDA Feb-maturity
+ *     exception is applied exactly once — at the period's true close.
+ *
+ *   raw(a, c₁) + raw(c₁, c₂) + … + dayCount30360(cₖ, e, {maturity})
+ *     = dayCount30360(a, e, {maturity}).
+ *
+ * A rate change whose effectiveFrom equals accrualEnd is excluded (strict `<`)
+ * so that the new rate takes effect in the following period. Including it
+ * would force the final inclusive strip to have zero days and would drop the
+ * closing day from accrual.
+ */
 function interestAccrued(
   principal: number,
   accrualStart: string,
@@ -81,25 +112,36 @@ function interestAccrued(
 ): number {
   const changeDates: string[] = [];
   for (const s of segments) {
-    if (compareIso(accrualStart, s.effectiveFrom) < 0 && compareIso(s.effectiveFrom, accrualEnd) <= 0) {
+    if (
+      compareIso(accrualStart, s.effectiveFrom) < 0 &&
+      compareIso(s.effectiveFrom, accrualEnd) < 0
+    ) {
       changeDates.push(s.effectiveFrom);
     }
   }
   changeDates.sort(compareIso);
 
+  const opts = dayCountOpts(loanEnd);
+
+  if (changeDates.length === 0) {
+    const days = dayCount30360(accrualStart, accrualEnd, opts);
+    const rate = annualRateOn(segments, accrualStart);
+    return roundCalc((principal * rate * days) / 360);
+  }
+
   let sum = 0;
   let cursor = accrualStart;
 
   for (const change of changeDates) {
-    const days = dayCount30360Raw(cursor, change, dayCountOpts(loanEnd));
+    const subDays = dayCount30360Raw(cursor, change);
     const rate = annualRateOn(segments, cursor);
-    sum = roundCalc(sum + roundCalc((principal * rate * days) / 360));
+    sum = roundCalc(sum + roundCalc((principal * rate * subDays) / 360));
     cursor = change;
   }
 
-  const daysLast = dayCount30360(cursor, accrualEnd, dayCountOpts(loanEnd));
-  const rateLast = annualRateOn(segments, cursor);
-  sum = roundCalc(sum + roundCalc((principal * rateLast * daysLast) / 360));
+  const lastDays = dayCount30360(cursor, accrualEnd, opts);
+  const lastRate = annualRateOn(segments, cursor);
+  sum = roundCalc(sum + roundCalc((principal * lastRate * lastDays) / 360));
 
   return sum;
 }
@@ -109,7 +151,8 @@ function interestAccrued(
  *
  * Day count: 30E/360 ISDA with end-of-month normalization.
  * Rate changes within a period are handled by splitting the period at each
- * rate boundary and summing the resulting interest sub-amounts.
+ * rate boundary and summing the resulting interest sub-amounts, using an
+ * additive decomposition that preserves the full-month and Feb-maturity rules.
  *
  * Rounding: intermediate values use roundCalc (10 dp); every field written
  * into a ScheduleEntry uses roundMoney (2 dp). See src/utils/math.ts.

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLazyQuery } from '@apollo/client';
+import { useApolloClient, useLazyQuery } from '@apollo/client';
 import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { ScheduleTable } from '../LoanDetail/ScheduleTable';
@@ -7,9 +7,11 @@ import { NewLoanModal } from '../LoanList/NewLoanModal';
 import { SIMULATE_LOAN } from '../../graphql/operations/loans';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+interface RateSegmentSnapshot {
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  annualRate: number;
+}
 
 interface SimulationResult {
   principal: number;
@@ -27,6 +29,7 @@ interface SimulationResult {
     total: number;
     remainingBalance: number;
   }>;
+  rateSegments: RateSegmentSnapshot[];
 }
 
 interface FormState {
@@ -40,10 +43,6 @@ interface FieldErrors {
   startDate?: string;
   endDate?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
 
 function validateForm(form: FormState): FieldErrors {
   const errors: FieldErrors = {};
@@ -69,11 +68,8 @@ function hasErrors(errors: FieldErrors): boolean {
   return Object.values(errors).some(Boolean);
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function LoanSimulationPage() {
+  const apolloClient = useApolloClient();
   const [form, setForm] = useState<FormState>({ principal: '', startDate: '', endDate: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -126,7 +122,6 @@ export function LoanSimulationPage() {
               <Field>
                 <Label htmlFor="sim-principal">Principal</Label>
                 <InputGroup>
-                  <CurrencyPrefix aria-hidden>$</CurrencyPrefix>
                   <Input
                     id="sim-principal"
                     inputMode="decimal"
@@ -138,6 +133,7 @@ export function LoanSimulationPage() {
                     aria-invalid={!!fieldErrors.principal}
                     aria-describedby={fieldErrors.principal ? 'err-principal' : undefined}
                   />
+                  <CurrencySuffix aria-hidden>$</CurrencySuffix>
                 </InputGroup>
                 {fieldErrors.principal && (
                   <FieldError id="err-principal" role="alert">{fieldErrors.principal}</FieldError>
@@ -185,7 +181,6 @@ export function LoanSimulationPage() {
           </Form>
         </InputCard>
 
-        {/* Error state */}
         {error && !loading && (
           <ErrorBanner role="alert">
             <ErrorIcon aria-hidden />
@@ -195,7 +190,6 @@ export function LoanSimulationPage() {
           </ErrorBanner>
         )}
 
-        {/* Results */}
         {result && !loading && (
           <>
             <PreviewBanner role="note">
@@ -255,13 +249,17 @@ export function LoanSimulationPage() {
       <NewLoanModal
         isOpen={isCreateModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        onCreated={() => setCreateModalOpen(false)}
+        onCreated={() => {
+          setCreateModalOpen(false);
+          void apolloClient.refetchQueries({ include: ['GetPortfolioSummary', 'GetLoans'] });
+        }}
         initialValues={
           result
             ? {
                 principal: String(result.principal),
                 startDate: result.startDate,
                 endDate: result.endDate,
+                rateSegments: result.rateSegments,
               }
             : undefined
         }
@@ -269,10 +267,6 @@ export function LoanSimulationPage() {
     </Page>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Icons
-// ---------------------------------------------------------------------------
 
 function InfoIcon({ className }: { className?: string }) {
   return (
@@ -291,10 +285,6 @@ function ErrorIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Styled components
-// ---------------------------------------------------------------------------
 
 const Page = styled.div`
   background: ${({ theme }) => theme.colors.background};
@@ -372,23 +362,31 @@ const Label = styled.label`
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
-const InputGroup = styled.div`
-  display: flex;
-  align-items: stretch;
-`;
-
-const CurrencyPrefix = styled.span`
+const CurrencySuffix = styled.span`
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
   border: 1px solid ${({ theme }) => theme.colors.border};
-  border-right: none;
-  border-radius: ${({ theme }) => theme.radius.md} 0 0 ${({ theme }) => theme.radius.md};
+  border-radius: 0 ${({ theme }) => theme.radius.md} ${({ theme }) => theme.radius.md} 0;
   background: ${({ theme }) => theme.colors.background};
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.fontSize.base};
   user-select: none;
   flex-shrink: 0;
+  transition: border-color 0.15s ease;
+`;
+
+const InputGroup = styled.div`
+  display: flex;
+  align-items: stretch;
+
+  &:focus-within ${CurrencySuffix} {
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &:has(input[aria-invalid='true']):focus-within ${CurrencySuffix} {
+    border-color: ${({ theme }) => theme.colors.error};
+  }
 `;
 
 const Input = styled.input<{ $hasError?: boolean }>`
@@ -404,9 +402,10 @@ const Input = styled.input<{ $hasError?: boolean }>`
   font-size: ${({ theme }) => theme.typography.fontSize.base};
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  /* When rendered inside InputGroup the left radius is owned by the CurrencyPrefix */
+  /* When rendered inside InputGroup the right radius is owned by the CurrencySuffix */
   ${InputGroup} & {
-    border-radius: 0 ${({ theme }) => theme.radius.md} ${({ theme }) => theme.radius.md} 0;
+    border-radius: ${({ theme }) => theme.radius.md} 0 0 ${({ theme }) => theme.radius.md};
+    border-right: none;
   }
 
   &::placeholder {

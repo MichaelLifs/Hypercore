@@ -18,6 +18,11 @@ export const SIMULATE_LOAN = gql`
         total
         remainingBalance
       }
+      rateSegments {
+        effectiveFrom
+        effectiveTo
+        annualRate
+      }
     }
   }
 `;
@@ -36,6 +41,21 @@ export const GET_LOANS = gql`
       total
       page
       pageSize
+    }
+  }
+`;
+
+export const GET_PORTFOLIO_SUMMARY = gql`
+  query GetPortfolioSummary {
+    portfolioSummary {
+      totalLoans
+      totalPrincipal
+      totalExpectedInterest
+      nextMaturity {
+        id
+        name
+        endDate
+      }
     }
   }
 `;

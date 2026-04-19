@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Home', end: true },
   { to: '/loans', label: 'Loans', end: false },
   { to: '/loan-simulation', label: 'Loan Simulation', end: false },
+  { to: '/statistics', label: 'Statistics', end: false },
 ];
 
 export function Header({ colorMode, onToggleColorMode }: HeaderProps) {
@@ -25,12 +26,10 @@ export function Header({ colorMode, onToggleColorMode }: HeaderProps) {
   const [isMobileNavOpen, setMobileNavOpen] = useState(false);
   const isDark = colorMode === 'dark';
 
-  // Close the mobile drawer whenever the route changes.
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
-  // Prevent body scroll while the mobile drawer is open.
   useEffect(() => {
     if (!isMobileNavOpen) return;
     const { overflow } = document.body.style;
@@ -303,30 +302,38 @@ const ThemeToggleIcon = styled.span<{ $align: 'left' | 'right'; $emphasize: bool
   pointer-events: none;
 `;
 
-const UtilityNavLink = styled(NavLink)`
+const utilityTextButtonStyles = css`
   padding: 8px 10px;
   border-radius: ${({ theme }) => theme.radius.md};
   background: transparent;
   font-size: ${({ theme }) => theme.typography.fontSize.sm};
   font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
   color: ${({ theme }) => theme.colors.textSecondary};
-  text-decoration: none;
   transition: background 0.12s ease, color 0.12s ease;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
 
   &:hover {
     background: ${({ theme }) => theme.colors.background};
     color: ${({ theme }) => theme.colors.textPrimary};
   }
 
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.primary};
+    outline-offset: 2px;
+  }
+`;
+
+const UtilityNavLink = styled(NavLink)`
+  ${utilityTextButtonStyles}
+  text-decoration: none;
+
   &[aria-current='page'] {
     background: ${({ theme }) => theme.colors.primaryLight};
     color: ${({ theme }) => theme.colors.primary};
     font-weight: ${({ theme }) => theme.typography.fontWeight.semibold};
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.primary};
-    outline-offset: 2px;
   }
 `;
 

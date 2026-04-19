@@ -32,11 +32,46 @@ type PaginatedLoans {
   pageSize: Int!
 }
 
+"""
+Aggregate view of the entire portfolio, computed server-side in SQL.
+Unlike paginated lists, these totals are correct for portfolios of any size.
+"""
+type PortfolioSummary {
+  totalLoans: Int!
+  totalPrincipal: Float!
+  totalExpectedInterest: Float!
+  nextMaturity: Loan
+}
+
+"""
+An immutable snapshot of one prime-rate segment as recorded for a simulation.
+When passed to createLoan, the schedule is generated from exactly these
+segments, guaranteeing that the persisted loan matches the simulated preview
+even if FRED updates between preview and creation.
+"""
+type RateSegmentSnapshot {
+  effectiveFrom: String!
+  effectiveTo: String
+  annualRate: Float!
+}
+
+input RateSegmentSnapshotInput {
+  effectiveFrom: String!
+  effectiveTo: String
+  annualRate: Float!
+}
+
 input CreateLoanInput {
   name: String!
   principal: Float!
   startDate: String!
   endDate: String!
+  """
+  Optional pre-fetched rate snapshot. Pass the `rateSegments` from a
+  simulateLoan result to guarantee the persisted schedule matches the
+  preview. If omitted, the server fetches the current FRED snapshot.
+  """
+  rateSegments: [RateSegmentSnapshotInput!]
 }
 
 input SimulateLoanInput {
@@ -63,12 +98,18 @@ type LoanSimulationResult {
   numberOfPayments: Int!
   firstPaymentDate: String
   repaymentSchedule: [SimulatedRepaymentEntry!]!
+  """
+  The rate snapshot used to generate this simulation. Pass this back to
+  createLoan via CreateLoanInput.rateSegments for preview-parity.
+  """
+  rateSegments: [RateSegmentSnapshot!]!
 }
 
 type Query {
   loans(page: Int, pageSize: Int): PaginatedLoans!
   loan(id: ID!): Loan
   simulateLoan(input: SimulateLoanInput!): LoanSimulationResult!
+  portfolioSummary: PortfolioSummary!
 }
 
 type Mutation {

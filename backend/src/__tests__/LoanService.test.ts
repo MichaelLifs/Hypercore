@@ -1,15 +1,6 @@
 import { assertValidCreateLoanInput, filterSegmentsForLoan } from '../domain/loan/LoanService';
 import type { FetchedPrimeRateSegment } from '../domain/prime-rate/PrimeRateFetcher';
 
-// ---------------------------------------------------------------------------
-// assertValidCreateLoanInput — covered by createLoanInput.test.ts; only
-// additional cases that improve signal are added here.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// filterSegmentsForLoan
-// ---------------------------------------------------------------------------
-
 function seg(
   effectiveFrom: string,
   effectiveTo: string | null,
@@ -34,16 +25,14 @@ describe('filterSegmentsForLoan', () => {
   ];
 
   it('returns only segments that overlap the loan period', () => {
-    // Loan [2022-03-01, 2022-10-01] overlaps B and C; A ends before start, D starts after end.
     const result = filterSegmentsForLoan(history, '2022-03-01', '2022-10-01');
 
     expect(result).toHaveLength(2);
-    expect(result[0].effectiveFrom).toBe('2022-01-01'); // B covers start
-    expect(result[1].effectiveFrom).toBe('2022-07-01'); // C mid-loan rate change
+    expect(result[0].effectiveFrom).toBe('2022-01-01');
+    expect(result[1].effectiveFrom).toBe('2022-07-01');
   });
 
   it('includes the segment that was in effect at startDate even when it started earlier', () => {
-    // Loan [2022-06-01, 2022-12-01]: B is active at start even though B began 2022-01-01.
     const result = filterSegmentsForLoan(history, '2022-06-01', '2022-12-01');
 
     expect(result[0].effectiveFrom).toBe('2022-01-01');
@@ -59,7 +48,6 @@ describe('filterSegmentsForLoan', () => {
   });
 
   it('throws when the loan starts before the first available rate', () => {
-    // No segment has effectiveFrom <= 2019-01-01 AND overlaps the loan.
     expect(() =>
       filterSegmentsForLoan(history, '2019-01-01', '2019-12-31'),
     ).toThrow();
@@ -70,7 +58,6 @@ describe('filterSegmentsForLoan', () => {
   });
 
   it('throws when a segment starts after startDate and nothing covers startDate', () => {
-    // Single segment that starts a month after the loan.
     const sparse = [seg('2024-02-01', null, 0.085)];
     expect(() =>
       filterSegmentsForLoan(sparse, '2024-01-01', '2025-01-01'),
@@ -78,11 +65,9 @@ describe('filterSegmentsForLoan', () => {
   });
 
   it('does not include segments whose effectiveTo is on or before startDate', () => {
-    // A ends 2022-01-01 — loan starts 2022-01-01.  effectiveTo (exclusive) = startDate → no overlap.
     const result = filterSegmentsForLoan(history, '2022-01-01', '2022-06-01');
 
-    // A: effectiveTo=2022-01-01, compareIso('2022-01-01', '2022-01-01') = 0, not > 0 → excluded
     expect(result.every((s) => s.effectiveFrom !== '2020-01-01')).toBe(true);
-    expect(result[0].effectiveFrom).toBe('2022-01-01'); // B covers start
+    expect(result[0].effectiveFrom).toBe('2022-01-01');
   });
 });

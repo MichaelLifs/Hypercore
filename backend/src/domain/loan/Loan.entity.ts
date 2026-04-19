@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
@@ -9,6 +10,8 @@ import { LoanRateSegment } from '../prime-rate/LoanRateSegment.entity';
 import { RepaymentEntry } from '../repayment/RepaymentEntry.entity';
 
 @Entity('loans')
+@Index('idx_loan_end_date', ['endDate'])
+@Index('idx_loan_created_at', ['createdAt'])
 export class Loan {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

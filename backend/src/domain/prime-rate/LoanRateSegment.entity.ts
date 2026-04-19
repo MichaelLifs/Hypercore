@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Loan } from '../loan/Loan.entity';
 
 /**
@@ -7,6 +7,7 @@ import { Loan } from '../loan/Loan.entity';
  * Rate is snapshotted at creation so schedule generation is deterministic.
  */
 @Entity('loan_rate_segments')
+@Index('idx_rate_segment_loan', ['loanId'])
 export class LoanRateSegment {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

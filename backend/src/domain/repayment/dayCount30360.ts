@@ -6,9 +6,26 @@
  * Public API measures accrual between two **calendar** dates that bound the
  * interest period **inclusively** (interest accrues through the end date).
  *
- * Full calendar months (start = 1st, end = last day of the same month) return
- * exactly 30 days by measuring to the first day of the following month, which
- * matches principal × (annualRate / 12) for an unchanged rate.
+ * Design:
+ *   inclusive [s, e] = raw(s, e+1)                                   (normal)
+ *   inclusive [s, e] = raw(s, e+1) − (30 − e.d)                      (Feb maturity)
+ *
+ * The Feb-maturity adjustment reverses the "every month = 30 days" stretch
+ * baked into raw 30E/360 when the period ends on the last day of February and
+ * that day is loan maturity (ISDA rule: do not normalize Feb 28/29 → 30 at
+ * maturity). Non-leap: subtract 2; leap: subtract 1.
+ *
+ * Additivity across rate-change splits is guaranteed by computing every
+ * intermediate sub-strip with `dayCount30360Raw` (half-open) and closing the
+ * final sub-strip with `dayCount30360` (inclusive). The two decompositions
+ * agree by construction:
+ *
+ *   raw(s, c₁) + raw(c₁, c₂) + … + dayCount30360(cₖ, e, opts)
+ *     = raw(s, e+1) − febMatAdj(e)
+ *     = dayCount30360(s, e, opts).
+ *
+ * A full calendar month (1st through last day, non-maturity-Feb) returns
+ * exactly 30 days, so a full month of interest equals principal × rate / 12.
  */
 
 export interface DayCount30360Options {
@@ -24,7 +41,7 @@ export interface DayCount30360Options {
 /** Calendar components for a UTC civil date (ISO YYYY-MM-DD), 1-based month. */
 interface CalendarDateParts {
   y: number;
-  m: number; // 1–12
+  m: number;
   d: number;
 }
 
@@ -68,24 +85,6 @@ function isLastDayOfFebruaryUtc(ymd: CalendarDateParts): boolean {
   return ymd.m === 2 && ymd.d === lastDayOfMonthUtc(ymd.y, 2);
 }
 
-function isFirstDayOfMonth(ymd: CalendarDateParts): boolean {
-  return ymd.d === 1;
-}
-
-function isLastDayOfMonth(ymd: CalendarDateParts): boolean {
-  return ymd.d === lastDayOfMonthUtc(ymd.y, ymd.m);
-}
-
-function sameYearMonth(a: CalendarDateParts, b: CalendarDateParts): boolean {
-  return a.y === b.y && a.m === b.m;
-}
-
-/** First calendar day of the month after `ymd` (UTC). */
-export function firstDayOfFollowingMonth(ymd: CalendarDateParts): CalendarDateParts {
-  if (ymd.m === 12) return { y: ymd.y + 1, m: 1, d: 1 };
-  return { y: ymd.y, m: ymd.m + 1, d: 1 };
-}
-
 function ymdToIso(ymd: CalendarDateParts): string {
   const mm = String(ymd.m).padStart(2, '0');
   const dd = String(ymd.d).padStart(2, '0');
@@ -103,14 +102,16 @@ export function addUtcDays(iso: string, deltaDays: number): string {
   });
 }
 
-function isCalendarFullMonthInclusive(start: CalendarDateParts, end: CalendarDateParts): boolean {
-  return isFirstDayOfMonth(start) && isLastDayOfMonth(end) && sameYearMonth(start, end);
-}
-
 /**
- * Raw ISDA 30E/360 difference between calendar dates (d1 < d2), matching
- * QuantLib Thirty360::ISDA_Impl::dayCount — used for half-open accrual
- * intervals and for splitting rate sub-periods additively.
+ * Raw ISDA 30E/360 day difference between calendar dates (d1 < d2), matching
+ * QuantLib Thirty360::ISDA_Impl::dayCount on a HALF-OPEN interval [d1, d2).
+ *
+ * When `options.loanMaturityDate` is supplied and d2 is that date, d2 being
+ * the last day of February is NOT normalized to 30 (ISDA Feb-maturity rule).
+ *
+ * For the ScheduleGenerator's rate-split sub-strips, pass no options: the
+ * Feb-maturity exception must be applied exactly once, at the period's
+ * inclusive closing via `dayCount30360`, otherwise additivity breaks.
  */
 export function dayCount30360Raw(
   d1Iso: string,
@@ -128,11 +129,11 @@ export function dayCount30360Raw(
   return isdaRawDayCount(d1, d2, maturity);
 }
 
-/**
- * Raw ISDA 30E/360 difference between two calendar dates (d1 < d2),
- * matching QuantLib Thirty360::ISDA_Impl::dayCount.
- */
-function isdaRawDayCount(d1: CalendarDateParts, d2: CalendarDateParts, maturity: CalendarDateParts | null): number {
+function isdaRawDayCount(
+  d1: CalendarDateParts,
+  d2: CalendarDateParts,
+  maturity: CalendarDateParts | null,
+): number {
   let dd1 = d1.d;
   let dd2 = d2.d;
   const mm1 = d1.m;
@@ -157,48 +158,17 @@ function isdaRawDayCount(d1: CalendarDateParts, d2: CalendarDateParts, maturity:
 }
 
 /**
- * Full calendar month (1st through last day of the same month), interest
- * measured inclusively. Uses the “day after month-end” shortcut except when the
- * period ends on the last day of February and that day is loan maturity (ISDA
- * does not normalize Feb 28/29 on d2 in that case).
- */
-function fullCalendarMonthInclusiveDays(
-  start: CalendarDateParts,
-  end: CalendarDateParts,
-  maturity: CalendarDateParts | null,
-): number {
-  const periodEndsOnMaturity =
-    maturity !== null && end.y === maturity.y && end.m === maturity.m && end.d === maturity.d;
-  const lastFeb = lastDayOfMonthUtc(end.y, 2);
-  if (end.m === 2 && end.d === lastFeb && periodEndsOnMaturity) {
-    return isdaRawDayCount(start, end, maturity);
-  }
-  const firstOfMonthAfterStart = firstDayOfFollowingMonth(start);
-  return isdaRawDayCount(start, firstOfMonthAfterStart, maturity);
-}
-
-/**
- * Inclusive [start, end] accrual length from raw pieces on half-open intervals:
- * raw(start, end+1day) − raw(end, end+1day).
- */
-function inclusiveSpanUsingExclusiveUpperBound(
-  start: CalendarDateParts,
-  end: CalendarDateParts,
-  maturity: CalendarDateParts | null,
-): number {
-  const exclusiveUpperIso = addUtcDays(ymdToIso(end), 1);
-  const exclusiveUpper = parseIsoDateStrict(exclusiveUpperIso);
-  return (
-    isdaRawDayCount(start, exclusiveUpper, maturity) - isdaRawDayCount(end, exclusiveUpper, maturity)
-  );
-}
-
-/**
- * 30E/360 ISDA accrual days from `inclusiveStart` through `inclusiveEnd`
- * (both inclusive). Returns 0 when both dates are equal.
+ * 30E/360 ISDA accrual days for the INCLUSIVE interval [inclusiveStart,
+ * inclusiveEnd]. Returns 0 when both dates are equal.
  *
- * For a full Gregorian calendar month (1st through last day of that month),
- * returns 30 days (via an internal measurement to the first day of the next month).
+ * For a full Gregorian calendar month (1st through the last day of the same
+ * month, not at Feb maturity) this returns 30 — matching the classical
+ * monthly-interest identity `principal × rate / 12`.
+ *
+ * When `loanMaturityDate` is supplied and the period ends on the last day of
+ * February and that day is loan maturity, February is NOT stretched to 30:
+ * the return value is reduced by `30 − actualLastDayOfFeb` (1 in leap years,
+ * 2 otherwise). This is ISDA's Feb-maturity rule.
  */
 export function dayCount30360(
   inclusiveStart: string,
@@ -215,13 +185,21 @@ export function dayCount30360(
   }
   if (cmp === 0) return 0;
 
+  // Inclusive [s, e] = half-open [s, e+1). Passing null maturity on the raw
+  // call because d2 = e+1 is never itself the last day of February — the
+  // Feb-maturity adjustment is applied explicitly below against `e`.
+  const endPlusOne = parseIsoDateStrict(addUtcDays(inclusiveEnd, 1));
+  let days = isdaRawDayCount(s, endPlusOne, null);
+
   const maturity = options?.loanMaturityDate
     ? parseIsoDateStrict(options.loanMaturityDate)
     : null;
-
-  if (isCalendarFullMonthInclusive(s, e)) {
-    return fullCalendarMonthInclusiveDays(s, e, maturity);
+  const endIsLastFeb = isLastDayOfFebruaryUtc(e);
+  const endIsMaturity =
+    maturity !== null && e.y === maturity.y && e.m === maturity.m && e.d === maturity.d;
+  if (endIsLastFeb && endIsMaturity) {
+    days -= 30 - e.d;
   }
 
-  return inclusiveSpanUsingExclusiveUpperBound(s, e, maturity);
+  return days;
 }

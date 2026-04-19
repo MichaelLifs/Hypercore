@@ -9,10 +9,15 @@ const dbPath = process.env.DB_PATH
   ? path.resolve(process.cwd(), process.env.DB_PATH)
   : path.resolve(process.cwd(), 'data', 'loans.db');
 
+// tsx runs .ts source directly; compiled production runs .js from dist/.
+const migrationsExt = __filename.endsWith('.ts') ? 'ts' : 'js';
+
 export const AppDataSource = new DataSource({
-  type: 'better-sqlite3', // SQLite driver for TypeORM
+  type: 'better-sqlite3',
   database: dbPath,
-  synchronize: true,
+  synchronize: false,
+  migrationsRun: true,
   logging: process.env.NODE_ENV === 'development',
   entities: [Loan, LoanRateSegment, RepaymentEntry],
+  migrations: [path.join(__dirname, `../migrations/*.${migrationsExt}`)],
 });

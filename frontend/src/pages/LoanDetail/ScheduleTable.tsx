@@ -19,9 +19,6 @@ interface ScheduleTableProps {
   variant?: 'default' | 'simulation';
 }
 
-/**
- * Pure presentational table — no data fetching here.
- */
 export function ScheduleTable({ entries, variant = 'default' }: ScheduleTableProps) {
   if (entries.length === 0) {
     return <Empty>No repayment schedule found.</Empty>;

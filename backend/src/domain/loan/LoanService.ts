@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { AppDataSource } from '../../database/dataSource';
 import { compareIso, parseIsoDateStrict } from '../repayment/dayCount30360';
 import { generateSchedule } from '../repayment/ScheduleGenerator';
@@ -13,6 +14,8 @@ export interface CreateLoanInput {
   principal: number;
   startDate: string;
   endDate: string;
+  /** Optional rate snapshot passed through from a prior simulateLoan call. */
+  rateSegments?: FetchedPrimeRateSegment[];
 }
 
 export interface PaginatedLoans {
@@ -20,6 +23,55 @@ export interface PaginatedLoans {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/** Optional filters for the paginated loans list (all fields optional). */
+export interface LoanListFilter {
+  search?: string | null;
+  startDateFrom?: string | null;
+  startDateTo?: string | null;
+  principalMin?: number | null;
+  principalMax?: number | null;
+  interestMin?: number | null;
+  interestMax?: number | null;
+}
+
+export type LoanSortField =
+  | 'CREATED_AT'
+  | 'NAME'
+  | 'PRINCIPAL'
+  | 'START_DATE'
+  | 'TOTAL_EXPECTED_INTEREST';
+
+export type LoanSortOrder = 'ASC' | 'DESC';
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+const MAX_TERM_YEARS = 50;
+const MAX_RATE_SEGMENTS_INPUT = 20;
+
+function assertValidPrincipal(principal: number): void {
+  if (!Number.isFinite(principal) || principal <= 0) {
+    throw new RangeError('principal must be a finite positive amount');
+  }
+}
+
+function assertValidLoanDates(startDate: string, endDate: string): void {
+  parseIsoDateStrict(startDate);
+  parseIsoDateStrict(endDate);
+  if (compareIso(endDate, startDate) <= 0) {
+    throw new RangeError('endDate must be after startDate');
+  }
+  const s = parseIsoDateStrict(startDate);
+  const e = parseIsoDateStrict(endDate);
+  const exceedsMax =
+    e.y - s.y > MAX_TERM_YEARS ||
+    (e.y - s.y === MAX_TERM_YEARS && (e.m > s.m || (e.m === s.m && e.d > s.d)));
+  if (exceedsMax) {
+    throw new RangeError(`Loan term may not exceed ${MAX_TERM_YEARS} years`);
+  }
 }
 
 /**
@@ -30,13 +82,18 @@ export function assertValidCreateLoanInput(input: CreateLoanInput): void {
   if (input.name.trim().length === 0) {
     throw new RangeError('Loan name must not be empty');
   }
-  if (!Number.isFinite(input.principal) || input.principal <= 0) {
-    throw new RangeError('principal must be a finite positive amount');
+  assertValidPrincipal(input.principal);
+  assertValidLoanDates(input.startDate, input.endDate);
+  if (input.rateSegments !== undefined && input.rateSegments.length > MAX_RATE_SEGMENTS_INPUT) {
+    throw new RangeError(`rateSegments may not exceed ${MAX_RATE_SEGMENTS_INPUT} entries`);
   }
-  parseIsoDateStrict(input.startDate);
-  parseIsoDateStrict(input.endDate);
-  if (compareIso(input.endDate, input.startDate) <= 0) {
-    throw new RangeError('endDate must be after startDate');
+}
+
+function assertSortedFetchedSegments(segments: FetchedPrimeRateSegment[]): void {
+  for (let i = 1; i < segments.length; i++) {
+    if (compareIso(segments[i - 1].effectiveFrom, segments[i].effectiveFrom) >= 0) {
+      throw new RangeError('rateSegments must be sorted strictly ascending by effectiveFrom');
+    }
   }
 }
 
@@ -58,6 +115,8 @@ export function filterSegmentsForLoan(
   startDate: string,
   endDate: string,
 ): FetchedPrimeRateSegment[] {
+  assertSortedFetchedSegments(allSegments);
+
   const relevant = allSegments.filter(
     (seg) =>
       compareIso(seg.effectiveFrom, endDate) <= 0 &&
@@ -70,8 +129,6 @@ export function filterSegmentsForLoan(
     );
   }
 
-  // The first (earliest) segment must cover startDate; if it starts after
-  // startDate there is a gap and the schedule generator cannot proceed.
   if (compareIso(relevant[0].effectiveFrom, startDate) > 0) {
     throw new Error(
       `No prime rate in effect on loan start date ${startDate}; ` +
@@ -100,22 +157,30 @@ export interface LoanSimulationResult {
   numberOfPayments: number;
   firstPaymentDate: string | null;
   repaymentSchedule: ScheduleEntry[];
+  rateSegments: FetchedPrimeRateSegment[];
 }
 
 /**
  * Runs the full schedule-generation pipeline (FRED fetch → filter → generate)
  * without touching the database.
  *
- * Returns a preview repayment schedule and summary figures that the caller
- * can either display (simulation) or persist (createLoan).
+ * If `providedSegments` is supplied, it is used verbatim instead of fetching
+ * FRED. This lets `createLoan` accept a snapshot returned by `simulateLoan`
+ * so that the persisted schedule matches the preview exactly, even if FRED
+ * has updated between calls.
  */
 async function buildLoanScheduleData(
   principal: number,
   startDate: string,
   endDate: string,
-): Promise<{ schedule: ScheduleEntry[]; totalExpectedInterest: number; rateSegments: FetchedPrimeRateSegment[] }> {
-  const allSegments = await fetchPrimeRateSegments();
-  const rateSegments = filterSegmentsForLoan(allSegments, startDate, endDate);
+  providedSegments?: FetchedPrimeRateSegment[],
+): Promise<{
+  schedule: ScheduleEntry[];
+  totalExpectedInterest: number;
+  rateSegments: FetchedPrimeRateSegment[];
+}> {
+  const sourceSegments = providedSegments ?? (await fetchPrimeRateSegments());
+  const rateSegments = filterSegmentsForLoan(sourceSegments, startDate, endDate);
   const rateSegmentsForGenerator = rateSegments.map((seg) => ({
     effectiveFrom: seg.effectiveFrom,
     annualRate: seg.annualRate,
@@ -132,16 +197,10 @@ async function buildLoanScheduleData(
  * Pure computation — nothing is written to the database.
  */
 export async function simulateLoan(input: SimulateLoanInput): Promise<LoanSimulationResult> {
-  if (!Number.isFinite(input.principal) || input.principal <= 0) {
-    throw new RangeError('principal must be a finite positive amount');
-  }
-  parseIsoDateStrict(input.startDate);
-  parseIsoDateStrict(input.endDate);
-  if (compareIso(input.endDate, input.startDate) <= 0) {
-    throw new RangeError('endDate must be after startDate');
-  }
+  assertValidPrincipal(input.principal);
+  assertValidLoanDates(input.startDate, input.endDate);
 
-  const { schedule, totalExpectedInterest } = await buildLoanScheduleData(
+  const { schedule, totalExpectedInterest, rateSegments } = await buildLoanScheduleData(
     input.principal,
     input.startDate,
     input.endDate,
@@ -155,6 +214,7 @@ export async function simulateLoan(input: SimulateLoanInput): Promise<LoanSimula
     numberOfPayments: schedule.length,
     firstPaymentDate: schedule[0]?.paymentDate ?? null,
     repaymentSchedule: schedule,
+    rateSegments,
   };
 }
 
@@ -163,9 +223,28 @@ export async function simulateLoan(input: SimulateLoanInput): Promise<LoanSimula
 // ---------------------------------------------------------------------------
 
 /**
- * Validates input, fetches the current prime rate history, generates the full
- * repayment schedule, and persists the loan, its rate snapshot, and the
- * repayment entries in a single transaction.
+ * Precomputed-interest storage, keyed by the Loan entity instance.
+ *
+ * Using a WeakMap (instead of augmenting the entity with a non-column field
+ * and testing `'totalExpectedInterest' in parent`) keeps the entity shape
+ * clean, avoids a silent failure mode if a real column of that name is ever
+ * added, and doesn't leak the cache beyond a single request lifetime.
+ */
+const precomputedInterestByLoan = new WeakMap<Loan, number>();
+
+export function getPrecomputedInterest(loan: Loan): number | undefined {
+  return precomputedInterestByLoan.get(loan);
+}
+
+export function setPrecomputedInterest(loan: Loan, value: number): void {
+  precomputedInterestByLoan.set(loan, value);
+}
+
+/**
+ * Validates input, optionally fetches the current prime rate history (only if
+ * the caller didn't pass a snapshot), generates the full repayment schedule,
+ * and persists the loan, its rate snapshot, and the repayment entries in a
+ * single transaction.
  *
  * The rate snapshot stored in loan_rate_segments is immutable after creation;
  * it is never re-fetched when reading a loan later.
@@ -177,6 +256,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     input.principal,
     input.startDate,
     input.endDate,
+    input.rateSegments,
   );
 
   const loan = await AppDataSource.transaction(async (em) => {
@@ -188,18 +268,21 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     });
     await em.save(saved);
 
-    const segmentEntities = rateSegments.map((seg) =>
-      em.create(LoanRateSegment, {
+    await em.insert(
+      LoanRateSegment,
+      rateSegments.map((seg) => ({
+        id: randomUUID(),
         loanId: saved.id,
         effectiveFrom: seg.effectiveFrom,
         effectiveTo: seg.effectiveTo,
         annualRate: seg.annualRate,
-      }),
+      })),
     );
-    await em.save(segmentEntities);
 
-    const entryEntities = schedule.map((entry) =>
-      em.create(RepaymentEntry, {
+    await em.insert(
+      RepaymentEntry,
+      schedule.map((entry) => ({
+        id: randomUUID(),
         loanId: saved.id,
         sequenceNumber: entry.sequenceNumber,
         paymentDate: entry.paymentDate,
@@ -208,16 +291,13 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
         interest: entry.interest,
         total: entry.total,
         remainingBalance: entry.remainingBalance,
-      }),
+      })),
     );
-    await em.save(entryEntities);
 
     return saved;
   });
 
-  // Attach the pre-computed value so the Loan.totalExpectedInterest field
-  // resolver can return it without an extra DB round-trip.
-  (loan as LoanWithPrecomputedInterest).totalExpectedInterest = totalExpectedInterest;
+  setPrecomputedInterest(loan, totalExpectedInterest);
   return loan;
 }
 
@@ -244,12 +324,67 @@ export async function getLoanById(id: string): Promise<Loan | null> {
 }
 
 // ---------------------------------------------------------------------------
+// Portfolio aggregates
+// ---------------------------------------------------------------------------
+
+export interface PortfolioSummary {
+  totalLoans: number;
+  totalPrincipal: number;
+  totalExpectedInterest: number;
+  nextMaturity: Loan | null;
+}
+
+/**
+ * Aggregate portfolio figures computed in SQL so they are correct for
+ * portfolios of any size. Previously the frontend computed these over the
+ * first 100 loans returned by `loans(page: 1, pageSize: 100)` — silently
+ * wrong for larger portfolios.
+ */
+export async function getPortfolioSummary(): Promise<PortfolioSummary> {
+  // UTC to match every other date in the domain (loan start/end, rate
+  // segments, schedule entries) which are ISO calendar dates with no timezone.
+  // Using local time here made nextMaturity replica-dependent around midnight.
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  // Single transaction so all three queries see a consistent snapshot.
+  // Without this, a createLoan arriving between queries produces aggregates
+  // that don't add up (e.g. totalLoans counts the new loan but totalExpectedInterest
+  // doesn't yet include its schedule rows).
+  return AppDataSource.transaction(async (em) => {
+    const loanAgg = await em
+      .createQueryBuilder(Loan, 'l')
+      .select('COUNT(*)', 'count')
+      .addSelect('COALESCE(SUM(l.principal), 0)', 'principal')
+      .getRawOne<{ count: string; principal: string | number }>();
+
+    const interestAgg = await em
+      .createQueryBuilder(RepaymentEntry, 'e')
+      .select('COALESCE(SUM(e.interest), 0)', 'interest')
+      .getRawOne<{ interest: string | number }>();
+
+    const nextMaturity = await em
+      .createQueryBuilder(Loan, 'l')
+      .where('l.endDate >= :today', { today: todayIso })
+      .orderBy('l.endDate', 'ASC')
+      .limit(1)
+      .getOne();
+
+    return {
+      totalLoans: Number(loanAgg?.count ?? 0),
+      totalPrincipal: roundMoney(Number(loanAgg?.principal ?? 0)),
+      totalExpectedInterest: roundMoney(Number(interestAgg?.interest ?? 0)),
+      nextMaturity: nextMaturity ?? null,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
 /**
  * Fetches SUM(interest) grouped by loanId in a single query and attaches the
- * result to each loan so the GraphQL field resolver can return it without
+ * result (via a WeakMap) so the GraphQL field resolver can return it without
  * issuing one query per loan.
  */
 async function precomputeTotalInterest(loans: Loan[]): Promise<void> {
@@ -266,14 +401,6 @@ async function precomputeTotalInterest(loans: Loan[]): Promise<void> {
   const byId = new Map(rows.map((r) => [r.loanId, roundMoney(Number(r.total))]));
 
   for (const loan of loans) {
-    (loan as LoanWithPrecomputedInterest).totalExpectedInterest = byId.get(loan.id) ?? 0;
+    setPrecomputedInterest(loan, byId.get(loan.id) ?? 0);
   }
-}
-
-/**
- * Augmented shape used internally to pass pre-computed interest from the
- * service to the resolver without leaking it into the entity definition.
- */
-export interface LoanWithPrecomputedInterest extends Loan {
-  totalExpectedInterest: number;
 }

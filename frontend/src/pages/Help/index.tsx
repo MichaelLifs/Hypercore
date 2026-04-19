@@ -5,7 +5,6 @@ export function HelpPage() {
   return (
     <Page>
       <Container>
-        {/* Header */}
         <PageHeader>
           <PageTitle>Help &amp; Guide</PageTitle>
           <PageSubtitle>
@@ -14,7 +13,6 @@ export function HelpPage() {
           </PageSubtitle>
         </PageHeader>
 
-        {/* How It Works */}
         <Section>
           <SectionLabel>Overview</SectionLabel>
           <SectionTitle>How It Works</SectionTitle>
@@ -220,7 +218,6 @@ const Container = styled.div`
   }
 `;
 
-// Page header
 const PageHeader = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing.xxl};
 `;
@@ -240,7 +237,6 @@ const PageSubtitle = styled.p`
   max-width: 560px;
 `;
 
-// Sections
 const Section = styled.section`
   margin-bottom: ${({ theme }) => theme.spacing.xxl};
 `;
@@ -263,14 +259,14 @@ const SectionTitle = styled.h2`
   margin-bottom: ${({ theme }) => theme.spacing.lg};
 `;
 
-// Flow steps
 const FlowGrid = styled.div`
   display: flex;
-  align-items: flex-start;
-  gap: 0;
+  align-items: stretch;
+  gap: ${({ theme }) => theme.spacing.md};
 
   @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
     flex-direction: column;
+    align-items: stretch;
   }
 `;
 
@@ -290,9 +286,9 @@ const StepCard = styled.div`
 
 const StepConnector = styled.div`
   flex-shrink: 0;
+  align-self: center;
   width: 32px;
   height: 2px;
-  margin-top: 36px;
   background: ${({ theme }) => theme.colors.border};
   position: relative;
 
@@ -309,10 +305,10 @@ const StepConnector = styled.div`
   }
 
   @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
+    align-self: center;
     width: 2px;
     height: 24px;
-    margin-top: 0;
-    margin-left: 20px;
+    margin-left: 0;
 
     &::after {
       right: auto;
@@ -357,7 +353,6 @@ const StepDescription = styled.p`
   line-height: ${({ theme }) => theme.typography.lineHeight.relaxed};
 `;
 
-// Content grid
 const ContentGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -419,7 +414,6 @@ const InfoCardTitle = styled.h2`
   margin-bottom: ${({ theme }) => theme.spacing.md};
 `;
 
-// Bullet list
 const BulletList = styled.ul`
   list-style: none;
   display: flex;
@@ -445,7 +439,6 @@ const BulletDot = styled.span`
   margin-top: 7px;
 `;
 
-// Schedule columns grid
 const ScheduleColumns = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);

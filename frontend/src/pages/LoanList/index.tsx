@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { Pagination } from '../../components/Pagination';
@@ -22,6 +22,7 @@ const PAGE_SIZE = 20;
 export function LoanListPage() {
   const [page, setPage] = useState(1);
   const [isModalOpen, setModalOpen] = useState(false);
+  const apolloClient = useApolloClient();
 
   const { data, loading, error, refetch } = useQuery<LoansQueryData>(GET_LOANS, {
     variables: { page, pageSize: PAGE_SIZE },
@@ -34,6 +35,7 @@ export function LoanListPage() {
     setModalOpen(false);
     setPage(1);
     refetch({ page: 1, pageSize: PAGE_SIZE });
+    void apolloClient.refetchQueries({ include: ['GetPortfolioSummary', 'GetLoans'] });
   };
 
   return (

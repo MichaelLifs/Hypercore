@@ -11,6 +11,7 @@ import { LoanListPage } from './pages/LoanList';
 import { LoanDetailPage } from './pages/LoanDetail';
 import { HelpPage } from './pages/Help';
 import { LoanSimulationPage } from './pages/LoanSimulation';
+import { StatisticsPage } from './pages/Statistics';
 
 const THEME_STORAGE_KEY = 'blm-color-mode';
 
@@ -19,7 +20,6 @@ function readStoredMode(): ColorMode {
     const raw = localStorage.getItem(THEME_STORAGE_KEY);
     if (raw === 'dark' || raw === 'light') return raw;
   } catch {
-    // ignore
   }
   return 'light';
 }
@@ -31,7 +31,6 @@ export function App() {
     try {
       localStorage.setItem(THEME_STORAGE_KEY, colorMode);
     } catch {
-      // ignore
     }
   }, [colorMode]);
 
@@ -55,6 +54,7 @@ export function App() {
               <Route path="/loan/:id" element={<LoanDetailPage />} />
               <Route path="/help" element={<HelpPage />} />
               <Route path="/loan-simulation" element={<LoanSimulationPage />} />
+              <Route path="/statistics" element={<StatisticsPage />} />
               <Route path="/interest-calculator" element={<Navigate to="/loan-simulation" replace />} />
               <Route path="/estimator" element={<Navigate to="/loan-simulation" replace />} />
             </Route>

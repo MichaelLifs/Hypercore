@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import styled from 'styled-components';
 import type { ColorMode } from '../styles/theme';
 import { Header } from './Header';
+import { Footer } from './Footer';
 
 interface AppShellProps {
   colorMode: ColorMode;
@@ -16,6 +17,7 @@ export function AppShell({ colorMode, onToggleColorMode }: AppShellProps) {
       <Main>
         <Outlet />
       </Main>
+      <Footer />
     </Shell>
   );
 }
