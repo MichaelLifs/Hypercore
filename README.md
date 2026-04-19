@@ -102,6 +102,9 @@ Tests live in `backend/src/__tests__/`. The test suite covers:
 
 - `dayCount30360.test.ts` — 30E/360 ISDA day count function, edge cases
 - `ScheduleGenerator.test.ts` — repayment schedule generation scenarios
+- `PrimeRateFetcher.test.ts` — FRED CSV parsing and segment building
+- `LoanService.test.ts` — rate segment filtering for a loan period
+- `createLoanInput.test.ts` — input validation for loan creation
 
 ---
 
@@ -195,44 +198,58 @@ mutation {
 ```
 bullet-loan-manager/
 ├── backend/
-│   ├── src/
-│   │   ├── database/dataSource.ts       # TypeORM DataSource (SQLite)
-│   │   ├── domain/
-│   │   │   ├── loan/
-│   │   │   │   ├── Loan.entity.ts
-│   │   │   │   └── LoanService.ts       # createLoan orchestration
-│   │   │   ├── prime-rate/
-│   │   │   │   ├── LoanRateSegment.entity.ts
-│   │   │   │   └── PrimeRateFetcher.ts  # FRED scrape
-│   │   │   └── repayment/
-│   │   │       ├── RepaymentEntry.entity.ts
-│   │   │       └── ScheduleGenerator.ts # pure domain logic
-│   │   ├── graphql/
-│   │   │   ├── schema.graphql
-│   │   │   └── resolvers/loan.resolver.ts
-│   │   └── index.ts
 │   └── src/
-│   │   └── __tests__/
-│   │       ├── dayCount30360.test.ts
-│   │       └── ScheduleGenerator.test.ts
+│       ├── __tests__/
+│       │   ├── dayCount30360.test.ts
+│       │   ├── ScheduleGenerator.test.ts
+│       │   ├── PrimeRateFetcher.test.ts
+│       │   ├── LoanService.test.ts
+│       │   └── createLoanInput.test.ts
+│       ├── database/
+│       │   └── dataSource.ts            # TypeORM DataSource (SQLite)
+│       ├── domain/
+│       │   ├── loan/
+│       │   │   ├── Loan.entity.ts
+│       │   │   └── LoanService.ts       # createLoan orchestration
+│       │   ├── prime-rate/
+│       │   │   ├── LoanRateSegment.entity.ts
+│       │   │   └── PrimeRateFetcher.ts  # FRED CSV fetch + parse
+│       │   └── repayment/
+│       │       ├── RepaymentEntry.entity.ts
+│       │       ├── ScheduleGenerator.ts # pure domain logic
+│       │       ├── dayCount30360.ts     # 30E/360 ISDA day count
+│       │       ├── repayment.types.ts
+│       │       └── paymentTypes.ts
+│       ├── graphql/
+│       │   ├── schema.graphql
+│       │   └── resolvers/loan.resolver.ts
+│       ├── utils/
+│       │   └── math.ts
+│       └── index.ts
 └── frontend/
     └── src/
-        ├── apollo/client.ts
+        ├── apollo/
+        │   └── client.ts
+        ├── components/
+        │   ├── Button.tsx
+        │   ├── Modal.tsx
+        │   └── Pagination.tsx
         ├── graphql/operations/
         │   ├── loans.ts
         │   └── loan.ts
         ├── pages/
         │   ├── LoanList/
+        │   │   ├── index.tsx
+        │   │   ├── LoanTable.tsx
+        │   │   └── NewLoanModal.tsx
         │   └── LoanDetail/
-        ├── components/
-        │   ├── Button.tsx
-        │   ├── Modal.tsx
-        │   └── Pagination.tsx
-        └── styles/theme.ts
+        │       ├── index.tsx
+        │       └── ScheduleTable.tsx
+        ├── styles/
+        │   ├── GlobalStyles.tsx
+        │   └── theme.ts
+        ├── types/
+        │   └── styled.d.ts
+        └── utils/
+            └── formatters.ts
 ```
-
----
-
-## AI Assistance
-
-See [chats.md](./chats.md) for the full record of AI-assisted sessions used during development.

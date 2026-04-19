@@ -77,9 +77,19 @@ export function parsePrimeRateCsv(csv: string): FetchedPrimeRateSegment[] {
  * Approach: public CSV export — stable, machine-readable, no API key needed.
  */
 export async function fetchPrimeRateSegments(): Promise<FetchedPrimeRateSegment[]> {
-  const { data } = await axios.get<string>(FRED_CSV_URL, {
-    responseType: 'text',
-    timeout: 10_000,
-  });
-  return parsePrimeRateCsv(data);
+  let csv: string;
+  try {
+    const { data } = await axios.get<string>(FRED_CSV_URL, {
+      responseType: 'text',
+      timeout: 10_000,
+    });
+    csv = data;
+  } catch (cause) {
+    throw new Error(
+      'Unable to fetch current prime rate from FRED (https://fred.stlouisfed.org). ' +
+        'Check your internet connection and try again.',
+      { cause },
+    );
+  }
+  return parsePrimeRateCsv(csv);
 }

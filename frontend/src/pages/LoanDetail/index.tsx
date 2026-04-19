@@ -1,22 +1,40 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@apollo/client';
 import styled from 'styled-components';
 import { Button } from '../../components/Button';
-import { ScheduleTable } from './ScheduleTable';
+import { ScheduleTable, RepaymentEntry } from './ScheduleTable';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { GET_LOAN } from '../../graphql/operations/loan';
 
-/**
- * Loan detail page — data fetching wired up in Phase 3 via useQuery(GET_LOAN).
- */
+interface LoanDetail {
+  id: string;
+  name: string;
+  principal: number;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  totalExpectedInterest: number;
+  repaymentSchedule: RepaymentEntry[];
+}
+
+interface GetLoanData {
+  loan: LoanDetail | null;
+}
+
 export function LoanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // Placeholder — replaced with useQuery(GET_LOAN, { variables: { id } }) in Phase 3
-  const loan = null;
-  const loading = false;
+  const { data, loading, error } = useQuery<GetLoanData>(GET_LOAN, {
+    variables: { id },
+    skip: !id,
+  });
+
+  const loan = data?.loan ?? null;
 
   if (loading) return <Container>Loading…</Container>;
+  if (error) return <Container>Failed to load loan. Is the backend running?</Container>;
   if (!loan) return <Container>Loan not found.</Container>;
 
   return (
@@ -29,18 +47,20 @@ export function LoanDetailPage() {
 
       <LoanHeader>
         <div>
-          <h1>{(loan as any).name}</h1>
+          <h1>{loan.name}</h1>
           <Meta>
-            <span>Principal: {formatCurrency((loan as any).principal)}</span>
+            <span>Principal: {formatCurrency(loan.principal)}</span>
             <Divider>·</Divider>
-            <span>{formatDate((loan as any).startDate)} → {formatDate((loan as any).endDate)}</span>
+            <span>
+              {formatDate(loan.startDate)} → {formatDate(loan.endDate)}
+            </span>
             <Divider>·</Divider>
-            <span>Total Interest: {formatCurrency((loan as any).totalExpectedInterest)}</span>
+            <span>Total Interest: {formatCurrency(loan.totalExpectedInterest)}</span>
           </Meta>
         </div>
       </LoanHeader>
 
-      <ScheduleTable entries={(loan as any).repaymentSchedule ?? []} />
+      <ScheduleTable entries={loan.repaymentSchedule} />
     </Container>
   );
 }

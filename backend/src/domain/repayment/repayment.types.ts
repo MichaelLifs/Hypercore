@@ -17,10 +17,3 @@ export interface ScheduleEntry {
   total: number;
   remainingBalance: number;
 }
-
-export interface ScheduleInput {
-  principal: number;
-  startDate: string;
-  endDate: string;
-  rateSegments: RateSegment[];
-}
