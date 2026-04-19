@@ -1,0 +1,49 @@
+type Loan {
+  id: ID!
+  name: String!
+  principal: Float!
+  startDate: String!
+  endDate: String!
+  createdAt: String!
+  totalExpectedInterest: Float!
+  repaymentSchedule: [RepaymentEntry!]!
+}
+
+type RepaymentEntry {
+  id: ID!
+  sequenceNumber: Int!
+  paymentDate: String!
+  paymentType: PaymentType!
+  principal: Float!
+  interest: Float!
+  total: Float!
+  remainingBalance: Float!
+}
+
+enum PaymentType {
+  INTEREST
+  PRINCIPAL_AND_INTEREST
+}
+
+type PaginatedLoans {
+  loans: [Loan!]!
+  total: Int!
+  page: Int!
+  pageSize: Int!
+}
+
+input CreateLoanInput {
+  name: String!
+  principal: Float!
+  startDate: String!
+  endDate: String!
+}
+
+type Query {
+  loans(page: Int, pageSize: Int): PaginatedLoans!
+  loan(id: ID!): Loan
+}
+
+type Mutation {
+  createLoan(input: CreateLoanInput!): Loan!
+}
