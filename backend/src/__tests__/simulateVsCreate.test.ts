@@ -3,14 +3,14 @@
  *
  * Both `simulateLoan` and `createLoan` delegate to the same
  * `buildLoanScheduleData` pipeline (not exported). We test the pipeline
- * directly via its two exported building blocks — `filterSegmentsForLoan`
- * and `generateSchedule` — avoiding any DB or network I/O while still
+ * directly via its two exported building blocks (`filterSegmentsForLoan`
+ * and `generateSchedule`), avoiding any DB or network I/O while still
  * exercising the full computation path that both service functions share.
  *
  * The guarantee under test:
  *   If the caller passes `simulateLoan`'s returned `rateSegments` snapshot
  *   into `createLoan`, the persisted schedule is byte-for-byte identical to
- *   the preview schedule — even if FRED publishes a new rate between the two
+ *   the preview schedule, even if FRED publishes a new rate between the two
  *   calls.
  */
 
@@ -79,7 +79,7 @@ describe('simulateLoan → createLoan schedule identity', () => {
     const startDate = '2022-04-15';
     const endDate = '2022-09-30';
 
-    // simulateLoan with the original history — snapshot is captured here.
+    // simulateLoan with the original history; snapshot is captured here.
     const { schedule: originalSchedule, rateSegments: snapshot } = pipeline(
       principal,
       startDate,
@@ -88,7 +88,7 @@ describe('simulateLoan → createLoan schedule identity', () => {
     );
 
     // After simulation, FRED publishes a revision that splits the 2022-01-01
-    // segment at 2022-06-01 with a higher rate — this overlaps the loan period.
+    // segment at 2022-06-01 with a higher rate; this overlaps the loan period.
     const updatedHistory: FetchedPrimeRateSegment[] = [
       { effectiveFrom: '2020-01-01', effectiveTo: '2022-01-01', annualRate: 0.0325 },
       { effectiveFrom: '2022-01-01', effectiveTo: '2022-06-01', annualRate: 0.035 },

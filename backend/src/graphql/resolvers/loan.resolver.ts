@@ -6,6 +6,9 @@ import {
   createLoan,
   simulateLoan,
   getLoans,
+  type LoanListFilter,
+  type LoanSortField,
+  type LoanSortOrder,
   getLoanById,
   getPortfolioSummary,
   getPrecomputedInterest,
@@ -13,6 +16,9 @@ import {
   CreateLoanInput,
   SimulateLoanInput,
 } from '../../domain/loan/LoanService';
+import { clearTestLoans, seedTestLoans } from '../../domain/loan/testDataSeed';
+import { runBackendTests } from '../../testing/runBackendTests';
+import { runFrontendTests } from '../../testing/runFrontendTests';
 import { roundMoney } from '../../utils/math';
 import type { FetchedPrimeRateSegment } from '../../domain/prime-rate/PrimeRateFetcher';
 
@@ -88,10 +94,25 @@ function toCreateLoanInput(
 
 export const loanResolvers = {
   Query: {
-    loans: async (_: unknown, args: { page?: number; pageSize?: number }) => {
+    loans: async (
+      _: unknown,
+      args: {
+        page?: number;
+        pageSize?: number;
+        filter?: LoanListFilter | null;
+        sortBy?: LoanSortField | null;
+        sortOrder?: LoanSortOrder | null;
+      },
+    ) => {
       const page = Math.max(1, args.page ?? 1);
       const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, args.pageSize ?? DEFAULT_PAGE_SIZE));
-      return getLoans(page, pageSize);
+      return getLoans(
+        page,
+        pageSize,
+        args.filter ?? undefined,
+        args.sortBy ?? undefined,
+        args.sortOrder ?? undefined,
+      );
     },
 
     loan: async (_: unknown, args: { id: string }) => {
@@ -121,6 +142,22 @@ export const loanResolvers = {
       },
     ) => {
       return createLoan(toCreateLoanInput(args));
+    },
+
+    seedTestLoans: async (_: unknown, args: { clearFirst?: boolean | null }) => {
+      return seedTestLoans(args.clearFirst === true);
+    },
+
+    clearTestLoans: async () => {
+      return clearTestLoans();
+    },
+
+    runBackendTests: async () => {
+      return runBackendTests();
+    },
+
+    runFrontendTests: async () => {
+      return runFrontendTests();
     },
   },
 
@@ -156,6 +193,6 @@ export const loanResolvers = {
   },
 
   PortfolioSummary: {
-    // nextMaturity is a Loan — let the Loan.* field resolvers kick in.
+    // nextMaturity is a Loan; let the Loan.* field resolvers kick in.
   },
 };

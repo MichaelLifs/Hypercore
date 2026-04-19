@@ -4,8 +4,8 @@ type Variant = 'primary' | 'secondary' | 'ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps {
-  variant?: Variant;
-  size?: Size;
+  $variant?: Variant;
+  $size?: Size;
 }
 
 const sizeStyles = {
@@ -65,8 +65,8 @@ export const Button = styled.button<ButtonProps>`
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
 
-  ${({ size = 'md' }) => sizeStyles[size]}
-  ${({ variant = 'primary' }) => variantStyles[variant]}
+  ${({ $size = 'md' }) => sizeStyles[$size]}
+  ${({ $variant = 'primary' }) => variantStyles[$variant]}
 
   &:disabled {
     opacity: 0.5;

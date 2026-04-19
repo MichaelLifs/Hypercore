@@ -7,7 +7,7 @@ export function Footer() {
   return (
     <FooterBar>
       <Inner>
-        <Brand>Bullet Loan Manager</Brand>
+        <Brand>Bullet Loan Platform</Brand>
         <Divider aria-hidden="true">·</Divider>
         <Copyright>© {YEAR} All rights reserved</Copyright>
         <SocialLink

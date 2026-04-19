@@ -28,14 +28,21 @@ export const SIMULATE_LOAN = gql`
 `;
 
 export const GET_LOANS = gql`
-  query GetLoans($page: Int, $pageSize: Int) {
-    loans(page: $page, pageSize: $pageSize) {
+  query GetLoans(
+    $page: Int
+    $pageSize: Int
+    $filter: LoanListFilterInput
+    $sortBy: LoanSortField
+    $sortOrder: SortOrder
+  ) {
+    loans(page: $page, pageSize: $pageSize, filter: $filter, sortBy: $sortBy, sortOrder: $sortOrder) {
       loans {
         id
         name
         principal
         startDate
         endDate
+        createdAt
         totalExpectedInterest
       }
       total

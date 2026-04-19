@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useMutation } from '@apollo/client';
+import toast from 'react-hot-toast';
 import styled from 'styled-components';
 import { Modal } from '../../components/Modal';
 import { Button } from '../../components/Button';
 import { CREATE_LOAN } from '../../graphql/operations/loans';
+import { validateLoanForm, hasFormErrors } from '../../utils/loanFormValidation';
+import type { LoanFormErrors } from '../../utils/loanFormValidation';
 
 interface RateSegmentSnapshot {
   effectiveFrom: string;
@@ -18,7 +21,7 @@ interface InitialValues {
   /**
    * Optional rate snapshot returned by `simulateLoan`. When present, it is
    * passed through to the mutation so the persisted schedule exactly matches
-   * the preview the user saw — even if FRED has since updated.
+   * the preview the user saw, even if FRED has since updated.
    */
   rateSegments?: RateSegmentSnapshot[];
 }
@@ -37,13 +40,6 @@ interface FormState {
   endDate: string;
 }
 
-interface FieldErrors {
-  name?: string;
-  principal?: string;
-  startDate?: string;
-  endDate?: string;
-}
-
 const EMPTY_FORM: FormState = {
   name: '',
   principal: '',
@@ -51,42 +47,12 @@ const EMPTY_FORM: FormState = {
   endDate: '',
 };
 
-function validateForm(form: FormState): FieldErrors {
-  const errors: FieldErrors = {};
-  const principal = Number(String(form.principal).replace(/,/g, ''));
-
-  if (!form.name.trim()) {
-    errors.name = 'Loan name is required';
-  }
-
-  if (!String(form.principal).trim()) {
-    errors.principal = 'Principal amount is required';
-  } else if (!Number.isFinite(principal) || principal <= 0) {
-    errors.principal = 'Enter a positive amount';
-  }
-
-  if (!form.startDate) {
-    errors.startDate = 'Start date is required';
-  }
-  if (!form.endDate) {
-    errors.endDate = 'End date is required';
-  } else if (form.startDate && form.endDate <= form.startDate) {
-    errors.endDate = 'End date must be after start date';
-  }
-
-  return errors;
-}
-
-function hasErrors(errors: FieldErrors): boolean {
-  return Object.values(errors).some(Boolean);
-}
-
 export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewLoanModalProps) {
   const [form, setForm] = useState<FormState>(() => ({
     ...EMPTY_FORM,
     ...initialValues,
   }));
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [fieldErrors, setFieldErrors] = useState<LoanFormErrors>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -106,8 +72,8 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validation = validateForm(form);
-    if (hasErrors(validation)) {
+    const validation = validateLoanForm(form);
+    if (hasFormErrors(validation)) {
       setFieldErrors(validation);
       return;
     }
@@ -131,10 +97,12 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
           },
         },
       });
+      toast.success('Loan created successfully', { id: 'loan-create' });
       setForm(EMPTY_FORM);
       setFieldErrors({});
       onCreated();
     } catch {
+      toast.error('Failed to create loan', { id: 'loan-create' });
     }
   };
 
@@ -226,7 +194,7 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
         {error && <ErrorMessage>{error.message}</ErrorMessage>}
 
         <Actions>
-          <Button type="button" variant="ghost" onClick={handleClose} disabled={loading}>
+          <Button type="button" $variant="ghost" onClick={handleClose} disabled={loading}>
             Cancel
           </Button>
           <Button type="submit" disabled={loading}>

@@ -8,7 +8,7 @@ const httpLink = new HttpLink({
 /**
  * Surface network/GraphQL errors in the console with a single, consistent
  * shape. Components still receive `error` from useQuery/useMutation and are
- * responsible for user-facing messaging — this link is purely for diagnostics.
+ * responsible for user-facing messaging; this link is purely for diagnostics.
  */
 const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
   if (graphQLErrors) {
@@ -43,7 +43,7 @@ export const apolloClient = new ApolloClient({
         },
       },
       /**
-       * PaginatedLoans has no `id` — Apollo can't normalize it. Merging by
+       * PaginatedLoans has no `id`, so Apollo can't normalize it. Merging by
        * replacement is correct because a new response for the same keyArgs
        * supersedes the old one.
        */

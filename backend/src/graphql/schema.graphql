@@ -32,6 +32,31 @@ type PaginatedLoans {
   pageSize: Int!
 }
 
+input LoanListFilterInput {
+  """Substring match on loan name (case-insensitive)."""
+  search: String
+  startDateFrom: String
+  startDateTo: String
+  principalMin: Float
+  principalMax: Float
+  interestMin: Float
+  interestMax: Float
+}
+
+enum LoanSortField {
+  CREATED_AT
+  NAME
+  PRINCIPAL
+  START_DATE
+  END_DATE
+  TOTAL_EXPECTED_INTEREST
+}
+
+enum SortOrder {
+  ASC
+  DESC
+}
+
 """
 Aggregate view of the entire portfolio, computed server-side in SQL.
 Unlike paginated lists, these totals are correct for portfolios of any size.
@@ -106,12 +131,89 @@ type LoanSimulationResult {
 }
 
 type Query {
-  loans(page: Int, pageSize: Int): PaginatedLoans!
+  loans(
+    page: Int
+    pageSize: Int
+    filter: LoanListFilterInput
+    sortBy: LoanSortField
+    sortOrder: SortOrder
+  ): PaginatedLoans!
   loan(id: ID!): Loan
   simulateLoan(input: SimulateLoanInput!): LoanSimulationResult!
   portfolioSummary: PortfolioSummary!
 }
 
+"""
+Result of seeding curated test loans into the real database via the internal
+Test page. Every field is a count so the UI can render a compact status line.
+"""
+type SeedTestLoansResult {
+  created: Int!
+  skipped: Int!
+  cleared: Int!
+  createdLabels: [String!]!
+}
+
+"""One `it(...)` assertion inside a test file."""
+type TestCaseResult {
+  fullName: String!
+  status: String!
+  failureMessages: [String!]!
+}
+
+"""One test file and its individual test-case results."""
+type TestSuiteResult {
+  suiteName: String!
+  passed: Boolean!
+  numPassed: Int!
+  numFailed: Int!
+  tests: [TestCaseResult!]!
+}
+
+"""
+Parsed summary of a jest --json run. Includes aggregate counts and the
+per-suite / per-test-case breakdown so the UI shows the full picture.
+"""
+type BackendTestResult {
+  success: Boolean!
+  numTotalTests: Int!
+  numPassedTests: Int!
+  numFailedTests: Int!
+  numPendingTests: Int!
+  numTotalTestSuites: Int!
+  numFailedTestSuites: Int!
+  durationMs: Int!
+  failureMessages: [String!]!
+  summary: String!
+  suites: [TestSuiteResult!]!
+}
+
+"""Result from running the frontend Vitest suite."""
+type FrontendTestResult {
+  success: Boolean!
+  numTotalTests: Int!
+  numPassedTests: Int!
+  numFailedTests: Int!
+  durationMs: Int!
+  summary: String!
+  suites: [TestSuiteResult!]!
+  failureMessages: [String!]!
+}
+
 type Mutation {
   createLoan(input: CreateLoanInput!): Loan!
+  """
+  Inserts a curated set of edge-case loans (mid-month start, leap Feb, rate
+  change on coupon date, zero-rate, etc.) into the real database through the
+  production `createLoan` pipeline. When `clearFirst` is true, previously
+  seeded test loans are deleted first; otherwise already-present scenarios are
+  skipped so repeated clicks don't duplicate data.
+  """
+  seedTestLoans(clearFirst: Boolean): SeedTestLoansResult!
+  """Removes every loan whose name starts with the internal test prefix."""
+  clearTestLoans: Int!
+  """Runs the backend jest suite out-of-process and returns a parsed summary."""
+  runBackendTests: BackendTestResult!
+  """Runs the frontend Vitest suite out-of-process and returns a parsed summary."""
+  runFrontendTests: FrontendTestResult!
 }

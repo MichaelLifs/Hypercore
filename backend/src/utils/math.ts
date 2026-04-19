@@ -6,9 +6,9 @@
  * bounded. Accumulated IEEE-754 drift across a typical loan is well below one cent.
  *
  * Rounding policy:
- *   roundCalc  — 10 decimal places, used for intermediate calculations to
+ *   roundCalc:  10 decimal places, used for intermediate calculations to
  *                preserve precision through chained multiplications.
- *   roundMoney — 2 decimal places, applied at the domain boundary before any
+ *   roundMoney: 2 decimal places, applied at the domain boundary before any
  *                value is persisted or returned to the caller.
  */
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApolloClient, useLazyQuery } from '@apollo/client';
+import toast from 'react-hot-toast';
 import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { ScheduleTable } from '../LoanDetail/ScheduleTable';
@@ -76,7 +77,12 @@ export function LoanSimulationPage() {
 
   const [runSimulation, { data, loading, error }] = useLazyQuery<{
     simulateLoan: SimulationResult;
-  }>(SIMULATE_LOAN, { fetchPolicy: 'network-only' });
+  }>(SIMULATE_LOAN, {
+    fetchPolicy: 'network-only',
+    onCompleted: () => {
+      toast.success('Simulation updated', { id: 'loan-simulation' });
+    },
+  });
 
   const result = data?.simulateLoan ?? null;
 
@@ -238,7 +244,7 @@ export function LoanSimulationPage() {
               <CtaCopy>
                 <strong>Ready to create this loan?</strong> Save it to your portfolio to start tracking principal and interest.
               </CtaCopy>
-              <Button variant="primary" onClick={() => setCreateModalOpen(true)}>
+              <Button $variant="primary" onClick={() => setCreateModalOpen(true)}>
                 Create Loan
               </Button>
             </CreateCta>

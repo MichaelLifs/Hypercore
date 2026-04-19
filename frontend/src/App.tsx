@@ -12,6 +12,8 @@ import { LoanDetailPage } from './pages/LoanDetail';
 import { HelpPage } from './pages/Help';
 import { LoanSimulationPage } from './pages/LoanSimulation';
 import { StatisticsPage } from './pages/Statistics';
+import { TestPage } from './pages/Test';
+import { AppToaster } from './components/AppToaster';
 
 const THEME_STORAGE_KEY = 'blm-color-mode';
 
@@ -44,7 +46,10 @@ export function App() {
     <ApolloProvider client={apolloClient}>
       <ThemeProvider theme={theme}>
         <GlobalStyles />
-        <BrowserRouter>
+        <AppToaster />
+        <BrowserRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <Routes>
             <Route
               element={<AppShell colorMode={colorMode} onToggleColorMode={toggleColorMode} />}
@@ -55,6 +60,7 @@ export function App() {
               <Route path="/help" element={<HelpPage />} />
               <Route path="/loan-simulation" element={<LoanSimulationPage />} />
               <Route path="/statistics" element={<StatisticsPage />} />
+              <Route path="/test" element={<TestPage />} />
               <Route path="/interest-calculator" element={<Navigate to="/loan-simulation" replace />} />
               <Route path="/estimator" element={<Navigate to="/loan-simulation" replace />} />
             </Route>

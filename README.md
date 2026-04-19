@@ -1,4 +1,4 @@
-# Bullet Loan Manager
+# Bullet Loan Platform
 
 A full-stack web application for managing bullet loans and their repayment schedules.
 
@@ -59,7 +59,7 @@ The `.env` file contains one variable:
 
 Open two terminals.
 
-**Terminal 1 — Backend:**
+**Terminal 1: Backend:**
 
 ```bash
 cd backend
@@ -68,7 +68,7 @@ npm run dev
 
 Server starts at `http://localhost:4000/graphql`.
 
-**Terminal 2 — Frontend:**
+**Terminal 2: Frontend:**
 
 ```bash
 cd frontend
@@ -100,11 +100,11 @@ npm test
 
 Tests live in `backend/src/__tests__/`. The test suite covers:
 
-- `dayCount30360.test.ts` — 30E/360 ISDA day count function, edge cases
-- `ScheduleGenerator.test.ts` — repayment schedule generation scenarios
-- `PrimeRateFetcher.test.ts` — FRED CSV parsing and segment building
-- `LoanService.test.ts` — rate segment filtering for a loan period
-- `createLoanInput.test.ts` — input validation for loan creation
+- `dayCount30360.test.ts`: 30E/360 ISDA day count function, edge cases
+- `ScheduleGenerator.test.ts`: repayment schedule generation scenarios
+- `PrimeRateFetcher.test.ts`: FRED CSV parsing and segment building
+- `LoanService.test.ts`: rate segment filtering for a loan period
+- `createLoanInput.test.ts`: input validation for loan creation
 
 ---
 

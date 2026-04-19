@@ -121,7 +121,7 @@ export function StatisticsPage() {
             <RecentSubtitle>Latest activity in your portfolio</RecentSubtitle>
           </div>
           {hasLoans && (
-            <Button variant="ghost" size="sm" onClick={() => navigate('/loans')}>
+            <Button $variant="ghost" $size="sm" onClick={() => navigate('/loans')}>
               View all →
             </Button>
           )}
@@ -135,7 +135,7 @@ export function StatisticsPage() {
             <ErrorDescription>
               The backend didn’t respond. Check your connection and try again.
             </ErrorDescription>
-            <Button variant="secondary" size="sm" onClick={() => void refetchLoans()}>
+            <Button $variant="secondary" $size="sm" onClick={() => void refetchLoans()}>
               Retry
             </Button>
           </ErrorState>

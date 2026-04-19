@@ -126,7 +126,7 @@ describe('generateSchedule', () => {
     // Jan: full month at old rate.
     expect(jan.interest).toBe(roundMoney((100_000 * 0.06 * 30) / 360));
     // Feb: full month at new rate AT MATURITY on 02-29, so ISDA Feb-maturity
-    // exception applies — Feb is not stretched to 30; 29 days at 12%.
+    // exception applies: Feb is not stretched to 30; 29 days at 12%.
     expect(feb.interest).toBe(roundMoney((100_000 * 0.12 * 29) / 360));
   });
 

@@ -162,7 +162,7 @@ function isdaRawDayCount(
  * inclusiveEnd]. Returns 0 when both dates are equal.
  *
  * For a full Gregorian calendar month (1st through the last day of the same
- * month, not at Feb maturity) this returns 30 — matching the classical
+ * month, not at Feb maturity) this returns 30, matching the classical
  * monthly-interest identity `principal × rate / 12`.
  *
  * When `loanMaturityDate` is supplied and the period ends on the last day of
@@ -186,7 +186,7 @@ export function dayCount30360(
   if (cmp === 0) return 0;
 
   // Inclusive [s, e] = half-open [s, e+1). Passing null maturity on the raw
-  // call because d2 = e+1 is never itself the last day of February — the
+  // call because d2 = e+1 is never itself the last day of February; the
   // Feb-maturity adjustment is applied explicitly below against `e`.
   const endPlusOne = parseIsoDateStrict(addUtcDays(inclusiveEnd, 1));
   let days = isdaRawDayCount(s, endPlusOne, null);

@@ -93,7 +93,7 @@ function monthEndCouponsBetween(start: string, end: string): string[] {
  *     belongs to the inclusive closing of the final strip.
  *   - The final sub-strip [cₖ, accrualEnd] is measured inclusively via
  *     `dayCount30360` WITH the loan maturity option, so the ISDA Feb-maturity
- *     exception is applied exactly once — at the period's true close.
+ *     exception is applied exactly once, at the period's true close.
  *
  *   raw(a, c₁) + raw(c₁, c₂) + … + dayCount30360(cₖ, e, {maturity})
  *     = dayCount30360(a, e, {maturity}).
@@ -147,7 +147,7 @@ function interestAccrued(
 }
 
 /**
- * Pure, deterministic schedule generator — no I/O, no side effects.
+ * Pure, deterministic schedule generator; no I/O, no side effects.
  *
  * Day count: 30E/360 ISDA with end-of-month normalization.
  * Rate changes within a period are handled by splitting the period at each

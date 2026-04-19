@@ -41,6 +41,7 @@ export type LoanSortField =
   | 'NAME'
   | 'PRINCIPAL'
   | 'START_DATE'
+  | 'END_DATE'
   | 'TOTAL_EXPECTED_INTEREST';
 
 export type LoanSortOrder = 'ASC' | 'DESC';
@@ -194,7 +195,7 @@ async function buildLoanScheduleData(
 
 /**
  * Previews a repayment schedule using real prime-rate data from FRED.
- * Pure computation — nothing is written to the database.
+ * Pure computation; nothing is written to the database.
  */
 export async function simulateLoan(input: SimulateLoanInput): Promise<LoanSimulationResult> {
   assertValidPrincipal(input.principal);
@@ -301,16 +302,83 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   return loan;
 }
 
+/** Excludes interest sort: pagination with joins requires ORDER BY without `.` (TypeORM distinct-id path). */
+const LOAN_SORT_COLUMN: Record<Exclude<LoanSortField, 'TOTAL_EXPECTED_INTEREST'>, string> = {
+  CREATED_AT: 'loan.createdAt',
+  NAME: 'loan.name',
+  PRINCIPAL: 'loan.principal',
+  START_DATE: 'loan.startDate',
+  END_DATE: 'loan.endDate',
+};
+
 /**
  * Returns a paginated list of loans, with totalExpectedInterest pre-computed
  * for all loans on the page in a single aggregation query (avoids N+1).
  */
-export async function getLoans(page: number, pageSize: number): Promise<PaginatedLoans> {
-  const [loans, total] = await AppDataSource.getRepository(Loan).findAndCount({
-    order: { createdAt: 'DESC' },
-    skip: (page - 1) * pageSize,
-    take: pageSize,
-  });
+export async function getLoans(
+  page: number,
+  pageSize: number,
+  filter?: LoanListFilter | null,
+  sortBy?: LoanSortField | null,
+  sortOrder?: LoanSortOrder | null,
+): Promise<PaginatedLoans> {
+  const repo = AppDataSource.getRepository(Loan);
+
+  const interestSubQuery = repo.manager
+    .createQueryBuilder()
+    .subQuery()
+    .select('e.loanId', 'loanId')
+    .addSelect('SUM(e.interest)', 'totalInterest')
+    .from(RepaymentEntry, 'e')
+    .groupBy('e.loanId')
+    .getQuery();
+
+  const qb = repo
+    .createQueryBuilder('loan')
+    .leftJoin(`(${interestSubQuery})`, 'iag', 'iag.loanId = loan.id');
+
+  const f = filter ?? {};
+  if (f.search?.trim()) {
+    qb.andWhere('INSTR(LOWER(loan.name), LOWER(:searchSub)) > 0', {
+      searchSub: f.search.trim(),
+    });
+  }
+  if (f.startDateFrom) {
+    qb.andWhere('loan.startDate >= :startDateFrom', { startDateFrom: f.startDateFrom });
+  }
+  if (f.startDateTo) {
+    qb.andWhere('loan.startDate <= :startDateTo', { startDateTo: f.startDateTo });
+  }
+  if (f.principalMin != null && Number.isFinite(f.principalMin)) {
+    qb.andWhere('loan.principal >= :principalMin', { principalMin: f.principalMin });
+  }
+  if (f.principalMax != null && Number.isFinite(f.principalMax)) {
+    qb.andWhere('loan.principal <= :principalMax', { principalMax: f.principalMax });
+  }
+  if (f.interestMin != null && Number.isFinite(f.interestMin)) {
+    qb.andWhere('COALESCE(iag.totalInterest, 0) >= :interestMin', { interestMin: f.interestMin });
+  }
+  if (f.interestMax != null && Number.isFinite(f.interestMax)) {
+    qb.andWhere('COALESCE(iag.totalInterest, 0) <= :interestMax', { interestMax: f.interestMax });
+  }
+
+  const order: 'ASC' | 'DESC' = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+  const field: LoanSortField = sortBy ?? 'CREATED_AT';
+  if (field === 'TOTAL_EXPECTED_INTEREST') {
+    qb.addSelect('COALESCE(iag.totalInterest, 0)', 'total_expected_interest_sort');
+    qb.orderBy('total_expected_interest_sort', order);
+  } else {
+    qb.orderBy(LOAN_SORT_COLUMN[field], order);
+  }
+  if (field !== 'CREATED_AT') {
+    qb.addOrderBy('loan.createdAt', 'DESC');
+  }
+
+  const total = await qb.clone().getCount();
+  const loans = await qb
+    .skip((page - 1) * pageSize)
+    .take(pageSize)
+    .getMany();
 
   if (loans.length > 0) {
     await precomputeTotalInterest(loans);
@@ -337,7 +405,7 @@ export interface PortfolioSummary {
 /**
  * Aggregate portfolio figures computed in SQL so they are correct for
  * portfolios of any size. Previously the frontend computed these over the
- * first 100 loans returned by `loans(page: 1, pageSize: 100)` — silently
+ * first 100 loans returned by `loans(page: 1, pageSize: 100)`, silently
  * wrong for larger portfolios.
  */
 export async function getPortfolioSummary(): Promise<PortfolioSummary> {

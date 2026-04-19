@@ -3,8 +3,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /**
  * Adds indexes on loans.endDate and loans.createdAt.
  *
- * loans.endDate  — used by getPortfolioSummary nextMaturity query (range scan)
- * loans.createdAt — used by getLoans ORDER BY createdAt DESC (sort scan)
+ * loans.endDate:  used by getPortfolioSummary nextMaturity query (range scan)
+ * loans.createdAt: used by getLoans ORDER BY createdAt DESC (sort scan)
  *
  * Both become full-table scans without these at 100k+ rows.
  * IF NOT EXISTS makes this safe to re-run or apply against a database

@@ -23,10 +23,10 @@ export function HomePage() {
             principal, interest, and maturity from a single, reliable surface.
           </HeroLede>
           <HeroActions>
-            <Button size="lg" onClick={() => setModalOpen(true)}>
+            <Button $size="lg" onClick={() => setModalOpen(true)}>
               + New Loan
             </Button>
-            <Button size="lg" variant="secondary" onClick={() => navigate('/loans')}>
+            <Button $size="lg" $variant="secondary" onClick={() => navigate('/loans')}>
               View Loans
             </Button>
           </HeroActions>

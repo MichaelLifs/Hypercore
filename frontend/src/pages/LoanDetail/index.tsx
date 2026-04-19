@@ -40,7 +40,7 @@ export function LoanDetailPage() {
   return (
     <Container>
       <BackBar>
-        <Button variant="ghost" size="sm" onClick={() => navigate('/loans')}>
+        <Button $variant="ghost" $size="sm" onClick={() => navigate('/loans')}>
           ← Back to Loans
         </Button>
       </BackBar>

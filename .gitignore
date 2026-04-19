@@ -9,6 +9,8 @@ chats.md
 
 # Test artifacts
 **/coverage/
+backend/.jest-output.json
+frontend/.vitest-output.json
 
 # Environment files
 .env

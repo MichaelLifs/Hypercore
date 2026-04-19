@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/loans', label: 'Loans', end: false },
   { to: '/loan-simulation', label: 'Loan Simulation', end: false },
   { to: '/statistics', label: 'Statistics', end: false },
+  { to: '/test', label: 'Test', end: false },
 ];
 
 export function Header({ colorMode, onToggleColorMode }: HeaderProps) {
@@ -43,7 +44,7 @@ export function Header({ colorMode, onToggleColorMode }: HeaderProps) {
     <>
       <Bar>
         <Inner>
-          <BrandLink to="/" aria-label="Bullet Loan Manager — Home">
+          <BrandLink to="/" aria-label="Bullet Loan Platform, Home">
             <LogoImg src="/logo.png" alt="" />
           </BrandLink>
 

@@ -33,7 +33,7 @@ const ALLOWED_HEADERS = new Set(['DATE,PRIME', 'OBSERVATION_DATE,PRIME']);
 /**
  * Parses the FRED prime rate CSV into chronologically ordered rate segments.
  *
- * Exported for unit testing — this is the only stateful-free piece worth
+ * Exported for unit testing; this is the only stateful-free piece worth
  * testing in isolation.
  */
 export function parsePrimeRateCsv(csv: string): FetchedPrimeRateSegment[] {
@@ -127,7 +127,7 @@ async function fetchFromFred(): Promise<FetchedPrimeRateSegment[]> {
  * chronologically ordered array of non-overlapping rate segments.
  *
  * Rate source: FRED "Bank Prime Loan Rate" (series PRIME).
- * Approach: public CSV export — stable, machine-readable, no API key needed.
+ * Approach: public CSV export (stable, machine-readable, no API key needed).
  *
  * Caches results for FRED_CACHE_TTL_MS. Falls back to the last-good snapshot
  * on transport failure so the app stays usable when FRED is unreachable.
