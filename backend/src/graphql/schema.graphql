@@ -39,9 +39,36 @@ input CreateLoanInput {
   endDate: String!
 }
 
+input SimulateLoanInput {
+  principal: Float!
+  startDate: String!
+  endDate: String!
+}
+
+type SimulatedRepaymentEntry {
+  sequenceNumber: Int!
+  paymentDate: String!
+  paymentType: PaymentType!
+  principal: Float!
+  interest: Float!
+  total: Float!
+  remainingBalance: Float!
+}
+
+type LoanSimulationResult {
+  principal: Float!
+  startDate: String!
+  endDate: String!
+  totalExpectedInterest: Float!
+  numberOfPayments: Int!
+  firstPaymentDate: String
+  repaymentSchedule: [SimulatedRepaymentEntry!]!
+}
+
 type Query {
   loans(page: Int, pageSize: Int): PaginatedLoans!
   loan(id: ID!): Loan
+  simulateLoan(input: SimulateLoanInput!): LoanSimulationResult!
 }
 
 type Mutation {

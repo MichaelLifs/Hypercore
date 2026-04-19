@@ -11,6 +11,7 @@ export const GlobalStyles = createGlobalStyle`
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    color-scheme: ${({ theme }) => (theme.mode === 'dark' ? 'dark' : 'light')};
   }
 
   body {

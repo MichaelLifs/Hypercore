@@ -3,9 +3,11 @@ import { Loan } from '../../domain/loan/Loan.entity';
 import { RepaymentEntry } from '../../domain/repayment/RepaymentEntry.entity';
 import {
   createLoan,
+  simulateLoan,
   getLoans,
   getLoanById,
   CreateLoanInput,
+  SimulateLoanInput,
   LoanWithPrecomputedInterest,
 } from '../../domain/loan/LoanService';
 import { roundMoney } from '../../utils/math';
@@ -22,6 +24,10 @@ export const loanResolvers = {
 
     loan: async (_: unknown, args: { id: string }) => {
       return getLoanById(args.id);
+    },
+
+    simulateLoan: async (_: unknown, args: { input: SimulateLoanInput }) => {
+      return simulateLoan(args.input);
     },
   },
 

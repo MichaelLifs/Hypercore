@@ -34,7 +34,7 @@ const variantStyles = {
     }
   `,
   secondary: css`
-    background: #fff;
+    background: ${({ theme }) => theme.colors.surface};
     color: ${({ theme }) => theme.colors.primary};
     border: 1.5px solid ${({ theme }) => theme.colors.primary};
 

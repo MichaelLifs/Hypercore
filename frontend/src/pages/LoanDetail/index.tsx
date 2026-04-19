@@ -33,9 +33,9 @@ export function LoanDetailPage() {
 
   const loan = data?.loan ?? null;
 
-  if (loading) return <Container>Loading…</Container>;
-  if (error) return <Container>Failed to load loan. Is the backend running?</Container>;
-  if (!loan) return <Container>Loan not found.</Container>;
+  if (loading) return <Container><StatusMessage>Loading…</StatusMessage></Container>;
+  if (error) return <Container><StatusMessage>Failed to load loan. Is the backend running?</StatusMessage></Container>;
+  if (!loan) return <Container><StatusMessage>Loan not found.</StatusMessage></Container>;
 
   return (
     <Container>
@@ -52,7 +52,7 @@ export function LoanDetailPage() {
             <span>Principal: {formatCurrency(loan.principal)}</span>
             <Divider>·</Divider>
             <span>
-              {formatDate(loan.startDate)} → {formatDate(loan.endDate)}
+              {formatDate(loan.startDate)} – {formatDate(loan.endDate)}
             </span>
             <Divider>·</Divider>
             <span>Total Interest: {formatCurrency(loan.totalExpectedInterest)}</span>
@@ -60,7 +60,9 @@ export function LoanDetailPage() {
         </div>
       </LoanHeader>
 
-      <ScheduleTable entries={loan.repaymentSchedule} />
+      <TableScroll>
+        <ScheduleTable entries={loan.repaymentSchedule} />
+      </TableScroll>
     </Container>
   );
 }
@@ -69,6 +71,15 @@ const Container = styled.div`
   max-width: 1200px;
   margin: 0 auto;
   padding: ${({ theme }) => theme.spacing.xl};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
+    padding: ${({ theme }) => theme.spacing.lg} ${({ theme }) => theme.spacing.md};
+  }
+`;
+
+const TableScroll = styled.div`
+  overflow-x: auto;
+  border-radius: ${({ theme }) => theme.radius.lg};
 `;
 
 const BackBar = styled.div`
@@ -97,4 +108,10 @@ const Meta = styled.div`
 
 const Divider = styled.span`
   color: ${({ theme }) => theme.colors.border};
+`;
+
+const StatusMessage = styled.p`
+  padding: ${({ theme }) => theme.spacing.xxl} 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.fontSize.base};
 `;

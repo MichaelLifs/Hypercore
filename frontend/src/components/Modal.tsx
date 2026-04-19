@@ -8,6 +8,19 @@ interface ModalProps {
   children: React.ReactNode;
 }
 
+function XIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M3 3l10 10M13 3L3 13"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -18,15 +31,29 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
     <Overlay onClick={onClose}>
-      <Dialog onClick={(e) => e.stopPropagation()} role="dialog" aria-modal>
+      <Dialog
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
         <Header>
-          <Title>{title}</Title>
+          <Title id="modal-title">{title}</Title>
           <CloseButton onClick={onClose} aria-label="Close">
-            ✕
+            <XIcon />
           </CloseButton>
         </Header>
         <Body>{children}</Body>
@@ -70,16 +97,28 @@ const Title = styled.h2`
 `;
 
 const CloseButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   background: none;
-  border: none;
-  font-size: 16px;
+  border: 1px solid transparent;
+  border-radius: ${({ theme }) => theme.radius.md};
   color: ${({ theme }) => theme.colors.textMuted};
   cursor: pointer;
-  padding: 4px;
-  line-height: 1;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 
   &:hover {
+    background: ${({ theme }) => theme.colors.background};
+    border-color: ${({ theme }) => theme.colors.border};
     color: ${({ theme }) => theme.colors.textPrimary};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.primary};
+    outline-offset: 2px;
   }
 `;
 

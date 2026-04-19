@@ -6,6 +6,7 @@ import { LoanRateSegment } from '../prime-rate/LoanRateSegment.entity';
 import { RepaymentEntry } from '../repayment/RepaymentEntry.entity';
 import { fetchPrimeRateSegments, FetchedPrimeRateSegment } from '../prime-rate/PrimeRateFetcher';
 import { roundMoney } from '../../utils/math';
+import type { ScheduleEntry } from '../repayment/repayment.types';
 
 export interface CreateLoanInput {
   name: string;
@@ -81,6 +82,86 @@ export function filterSegmentsForLoan(
   return relevant;
 }
 
+// ---------------------------------------------------------------------------
+// Simulation
+// ---------------------------------------------------------------------------
+
+export interface SimulateLoanInput {
+  principal: number;
+  startDate: string;
+  endDate: string;
+}
+
+export interface LoanSimulationResult {
+  principal: number;
+  startDate: string;
+  endDate: string;
+  totalExpectedInterest: number;
+  numberOfPayments: number;
+  firstPaymentDate: string | null;
+  repaymentSchedule: ScheduleEntry[];
+}
+
+/**
+ * Runs the full schedule-generation pipeline (FRED fetch → filter → generate)
+ * without touching the database.
+ *
+ * Returns a preview repayment schedule and summary figures that the caller
+ * can either display (simulation) or persist (createLoan).
+ */
+async function buildLoanScheduleData(
+  principal: number,
+  startDate: string,
+  endDate: string,
+): Promise<{ schedule: ScheduleEntry[]; totalExpectedInterest: number; rateSegments: FetchedPrimeRateSegment[] }> {
+  const allSegments = await fetchPrimeRateSegments();
+  const rateSegments = filterSegmentsForLoan(allSegments, startDate, endDate);
+  const rateSegmentsForGenerator = rateSegments.map((seg) => ({
+    effectiveFrom: seg.effectiveFrom,
+    annualRate: seg.annualRate,
+  }));
+  const schedule = generateSchedule(principal, startDate, endDate, rateSegmentsForGenerator);
+  const totalExpectedInterest = roundMoney(
+    schedule.reduce((sum, entry) => sum + entry.interest, 0),
+  );
+  return { schedule, totalExpectedInterest, rateSegments };
+}
+
+/**
+ * Previews a repayment schedule using real prime-rate data from FRED.
+ * Pure computation — nothing is written to the database.
+ */
+export async function simulateLoan(input: SimulateLoanInput): Promise<LoanSimulationResult> {
+  if (!Number.isFinite(input.principal) || input.principal <= 0) {
+    throw new RangeError('principal must be a finite positive amount');
+  }
+  parseIsoDateStrict(input.startDate);
+  parseIsoDateStrict(input.endDate);
+  if (compareIso(input.endDate, input.startDate) <= 0) {
+    throw new RangeError('endDate must be after startDate');
+  }
+
+  const { schedule, totalExpectedInterest } = await buildLoanScheduleData(
+    input.principal,
+    input.startDate,
+    input.endDate,
+  );
+
+  return {
+    principal: input.principal,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    totalExpectedInterest,
+    numberOfPayments: schedule.length,
+    firstPaymentDate: schedule[0]?.paymentDate ?? null,
+    repaymentSchedule: schedule,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Persistence
+// ---------------------------------------------------------------------------
+
 /**
  * Validates input, fetches the current prime rate history, generates the full
  * repayment schedule, and persists the loan, its rate snapshot, and the
@@ -92,23 +173,10 @@ export function filterSegmentsForLoan(
 export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   assertValidCreateLoanInput(input);
 
-  const allSegments = await fetchPrimeRateSegments();
-  const relevant = filterSegmentsForLoan(allSegments, input.startDate, input.endDate);
-
-  const rateSegmentsForGenerator = relevant.map((seg) => ({
-    effectiveFrom: seg.effectiveFrom,
-    annualRate: seg.annualRate,
-  }));
-
-  const schedule = generateSchedule(
+  const { schedule, totalExpectedInterest, rateSegments } = await buildLoanScheduleData(
     input.principal,
     input.startDate,
     input.endDate,
-    rateSegmentsForGenerator,
-  );
-
-  const totalExpectedInterest = roundMoney(
-    schedule.reduce((sum, entry) => sum + entry.interest, 0),
   );
 
   const loan = await AppDataSource.transaction(async (em) => {
@@ -120,7 +188,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     });
     await em.save(saved);
 
-    const segmentEntities = relevant.map((seg) =>
+    const segmentEntities = rateSegments.map((seg) =>
       em.create(LoanRateSegment, {
         loanId: saved.id,
         effectiveFrom: seg.effectiveFrom,
