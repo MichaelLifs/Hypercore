@@ -2,7 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
-interface RepaymentEntry {
+export interface RepaymentEntry {
   id: string;
   sequenceNumber: number;
   paymentDate: string;

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
-interface LoanRow {
+export interface LoanRow {
   id: string;
   name: string;
   principal: number;
@@ -12,20 +12,16 @@ interface LoanRow {
 }
 
 interface LoanTableProps {
-  page: number;
+  loans: LoanRow[];
+  loading: boolean;
+  error?: Error;
 }
 
-/**
- * Renders a list of loans. Query wiring: Phase 3.
- */
-export function LoanTable({ page: _page }: LoanTableProps) {
+export function LoanTable({ loans, loading, error }: LoanTableProps) {
   const navigate = useNavigate();
 
-  // Placeholder — replaced with useQuery(GET_LOANS) in Phase 3
-  const loans: LoanRow[] = [];
-  const loading = false;
-
   if (loading) return <Empty>Loading loans…</Empty>;
+  if (error) return <Empty>Failed to load loans. Is the backend running?</Empty>;
   if (loans.length === 0) return <Empty>No loans yet. Create your first loan.</Empty>;
 
   return (

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useMutation } from '@apollo/client';
 import styled from 'styled-components';
 import { Modal } from '../../components/Modal';
 import { Button } from '../../components/Button';
+import { CREATE_LOAN } from '../../graphql/operations/loans';
 
 interface NewLoanModalProps {
   isOpen: boolean;
@@ -23,19 +25,32 @@ const EMPTY_FORM: FormState = {
   endDate: '',
 };
 
-/**
- * Form stub — mutation wiring: Phase 3.
- */
-export function NewLoanModal({ isOpen, onClose, onCreated: _onCreated }: NewLoanModalProps) {
+export function NewLoanModal({ isOpen, onClose, onCreated }: NewLoanModalProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+
+  const [createLoan, { loading, error }] = useMutation(CREATE_LOAN);
 
   const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Phase 3: call useMutation(CREATE_LOAN)
-    console.log('Create loan (Phase 3):', form);
+    try {
+      await createLoan({
+        variables: {
+          input: {
+            name: form.name.trim(),
+            principal: parseFloat(form.principal),
+            startDate: form.startDate,
+            endDate: form.endDate,
+          },
+        },
+      });
+      setForm(EMPTY_FORM);
+      onCreated();
+    } catch {
+      // error rendered below from `error` state
+    }
   };
 
   const handleClose = () => {
@@ -48,7 +63,13 @@ export function NewLoanModal({ isOpen, onClose, onCreated: _onCreated }: NewLoan
       <Form onSubmit={handleSubmit}>
         <Field>
           <Label htmlFor="name">Loan Name</Label>
-          <Input id="name" value={form.name} onChange={set('name')} required placeholder="e.g. Acme Bridge Loan" />
+          <Input
+            id="name"
+            value={form.name}
+            onChange={set('name')}
+            required
+            placeholder="e.g. Acme Bridge Loan"
+          />
         </Field>
 
         <Field>
@@ -68,19 +89,35 @@ export function NewLoanModal({ isOpen, onClose, onCreated: _onCreated }: NewLoan
         <Row>
           <Field>
             <Label htmlFor="startDate">Start Date</Label>
-            <Input id="startDate" type="date" value={form.startDate} onChange={set('startDate')} required />
+            <Input
+              id="startDate"
+              type="date"
+              value={form.startDate}
+              onChange={set('startDate')}
+              required
+            />
           </Field>
           <Field>
             <Label htmlFor="endDate">End Date</Label>
-            <Input id="endDate" type="date" value={form.endDate} onChange={set('endDate')} required />
+            <Input
+              id="endDate"
+              type="date"
+              value={form.endDate}
+              onChange={set('endDate')}
+              required
+            />
           </Field>
         </Row>
 
+        {error && <ErrorMessage>{error.message}</ErrorMessage>}
+
         <Actions>
-          <Button type="button" variant="ghost" onClick={handleClose}>
+          <Button type="button" variant="ghost" onClick={handleClose} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit">Create Loan</Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Creating…' : 'Create Loan'}
+          </Button>
         </Actions>
       </Form>
     </Modal>
@@ -129,6 +166,11 @@ const Input = styled.input`
   &::placeholder {
     color: ${({ theme }) => theme.colors.textMuted};
   }
+`;
+
+const ErrorMessage = styled.p`
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }) => theme.colors.error};
 `;
 
 const Actions = styled.div`

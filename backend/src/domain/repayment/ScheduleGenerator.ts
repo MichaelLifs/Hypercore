@@ -8,7 +8,7 @@ import {
   parseIsoDateStrict,
   type DayCount30360Options,
 } from './dayCount30360';
-import type { RateSegment, ScheduleEntry, ScheduleInput } from './repayment.types';
+import type { RateSegment, ScheduleEntry } from './repayment.types';
 
 function dayCountOpts(endDate: string): DayCount30360Options {
   return { loanMaturityDate: endDate };
@@ -178,8 +178,4 @@ export function generateSchedule(
   }
 
   return entries;
-}
-
-export function generateScheduleFromInput(input: ScheduleInput): ScheduleEntry[] {
-  return generateSchedule(input.principal, input.startDate, input.endDate, input.rateSegments);
 }
