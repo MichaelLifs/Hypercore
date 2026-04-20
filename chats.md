@@ -2,7 +2,7 @@
 
 ## Overview
 
-Assistive tools were used selectively during development to support thinking, sanity-check decisions, and speed up low-value work. Core domain logic — including the day-count implementation, schedule generation, rate splitting, error handling, and test coverage — was designed, implemented, and validated manually.
+Assistive tools were used selectively during development to support thinking, sanity-check decisions, and speed up low-value work. Core domain logic including the day-count implementation, schedule generation, rate splitting, error handling, and test coverage was designed, implemented, and validated manually.
 
 The goal was to use external tools as a thinking partner, not as a source of truth.
 
@@ -48,7 +48,7 @@ Design a repayment schedule generator for bullet loans with monthly interest pay
 
 **My decision**  
 Adopted the period-splitting approach and backend ownership model.  
-Did not rely on suggested rounding blindly — final behavior was validated through tests and manual checks.
+Did not rely on suggested rounding blindly final behavior was validated through tests and manual checks.
 
 **Why**  
 Splitting periods ensures additivity and prevents hidden drift when rates change mid-period.  
@@ -118,4 +118,4 @@ Keeping the frontend thin avoids inconsistencies between displayed and actual fi
 - Assistive tools were used for ideation and validation, not as a replacement for engineering judgment.  
 - All financial logic and edge cases were implemented and tested independently.  
 - Any generated suggestions were reviewed, adapted, and validated before being integrated.  
-- The goal throughout was correctness, determinism, and clarity — not speed of implementation.
+- The goal throughout was correctness, determinism, and clarity not speed of implementation.
