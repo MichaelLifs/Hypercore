@@ -144,10 +144,6 @@ describe('generateSchedule', () => {
     expect(sumInterest).toBeGreaterThan(0);
   });
 
-  // ---------------------------------------------------------------------------
-  // Input validation
-  // ---------------------------------------------------------------------------
-
   it('rejects principal <= 0', () => {
     expect(() => generateSchedule(0, '2024-01-01', '2024-02-01', [r(0.05)])).toThrow(RangeError);
   });
@@ -184,10 +180,6 @@ describe('generateSchedule', () => {
   it('rejects NaN principal', () => {
     expect(() => generateSchedule(Number.NaN, '2024-01-01', '2024-02-01', [r(0.05)])).toThrow(RangeError);
   });
-
-  // ---------------------------------------------------------------------------
-  // Bug regressions and financial edge cases
-  // ---------------------------------------------------------------------------
 
   it('REGRESSION: mid-month start does not drop the first coupon day', () => {
     // Pre-fix bug: the first coupon day (01-31) earned no interest when the

@@ -22,11 +22,9 @@ export class Loan {
   @Column('real')
   principal!: number;
 
-  /** ISO date string: YYYY-MM-DD */
   @Column('text')
   startDate!: string;
 
-  /** ISO date string: YYYY-MM-DD */
   @Column('text')
   endDate!: string;
 

@@ -1,15 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Adds indexes on loans.endDate and loans.createdAt.
- *
- * loans.endDate:  used by getPortfolioSummary nextMaturity query (range scan)
- * loans.createdAt: used by getLoans ORDER BY createdAt DESC (sort scan)
- *
- * Both become full-table scans without these at 100k+ rows.
- * IF NOT EXISTS makes this safe to re-run or apply against a database
- * that already had these indexes added manually.
- */
+// endDate supports the portfolio nextMaturity scan; createdAt supports the
+// default ORDER BY in getLoans. Both degrade to full-table scans at scale.
 export class AddLoanIndexes1745000000000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

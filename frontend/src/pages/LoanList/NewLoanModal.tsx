@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { CREATE_LOAN } from '../../graphql/operations/loans';
 import { validateLoanForm, hasFormErrors } from '../../utils/loanFormValidation';
 import type { LoanFormErrors } from '../../utils/loanFormValidation';
+import { userFacingErrorMessage } from '../../utils/graphqlError';
 
 interface RateSegmentSnapshot {
   effectiveFrom: string;
@@ -18,11 +19,7 @@ interface InitialValues {
   principal?: string;
   startDate?: string;
   endDate?: string;
-  /**
-   * Optional rate snapshot returned by `simulateLoan`. When present, it is
-   * passed through to the mutation so the persisted schedule exactly matches
-   * the preview the user saw, even if FRED has since updated.
-   */
+  /** Rate snapshot from simulateLoan, pinned so createLoan reproduces the preview. */
   rateSegments?: RateSegmentSnapshot[];
 }
 
@@ -191,7 +188,7 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
           </Field>
         </Row>
 
-        {error && <ErrorMessage>{error.message}</ErrorMessage>}
+        {error && <ErrorMessage>{userFacingErrorMessage(error)}</ErrorMessage>}
 
         <Actions>
           <Button type="button" $variant="ghost" onClick={handleClose} disabled={loading}>

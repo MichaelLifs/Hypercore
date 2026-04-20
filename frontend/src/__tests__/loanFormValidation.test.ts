@@ -18,8 +18,6 @@ describe('validateLoanForm', () => {
     expect(hasFormErrors(errors)).toBe(false);
   });
 
-  // ----- name -----
-
   it('requires a non-empty name', () => {
     const errors = validateLoanForm({ ...VALID, name: '' });
     expect(errors.name).toBeTruthy();
@@ -34,8 +32,6 @@ describe('validateLoanForm', () => {
     const errors = validateLoanForm({ ...VALID, name: '  My Loan  ' });
     expect(errors.name).toBeFalsy();
   });
-
-  // ----- principal -----
 
   it('requires a principal value', () => {
     const errors = validateLoanForm({ ...VALID, principal: '' });
@@ -66,8 +62,6 @@ describe('validateLoanForm', () => {
     const errors = validateLoanForm({ ...VALID, principal: '50000.50' });
     expect(errors.principal).toBeFalsy();
   });
-
-  // ----- dates -----
 
   it('requires a start date', () => {
     const errors = validateLoanForm({ ...VALID, startDate: '' });

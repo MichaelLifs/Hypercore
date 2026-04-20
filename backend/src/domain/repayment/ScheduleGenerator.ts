@@ -30,12 +30,8 @@ function assertRateSegmentValues(segments: RateSegment[]): void {
   }
 }
 
-/**
- * Binary search for the rate segment that applies on `asOf`.
- *
- * Assumes `segments` is sorted strictly ascending by `effectiveFrom` (validated
- * once in `generateSchedule` before this is ever called).
- */
+// Assumes `segments` is sorted strictly ascending by `effectiveFrom`
+// (validated in `generateSchedule` before this is called).
 function annualRateOn(segments: RateSegment[], asOf: string): number {
   let lo = 0;
   let hi = segments.length - 1;
@@ -55,7 +51,7 @@ function annualRateOn(segments: RateSegment[], asOf: string): number {
   return segments[bestIdx].annualRate;
 }
 
-/** Month-end coupon dates L with start < L < end (strict). */
+/** Month-end coupon dates L with start < L < end. */
 function monthEndCouponsBetween(start: string, end: string): string[] {
   const out: string[] = [];
   const s = parseIsoDateStrict(start);
@@ -83,25 +79,16 @@ function monthEndCouponsBetween(start: string, end: string): string[] {
 }
 
 /**
- * Interest accrued over [accrualStart, accrualEnd] INCLUSIVELY, splitting the
- * period at each rate change so the correct rate applies to each strip.
+ * Accrues interest over [accrualStart, accrualEnd] inclusively, splitting at
+ * each rate change. Intermediate strips are measured half-open via
+ * `dayCount30360Raw` (no maturity option); the final strip is closed
+ * inclusively via `dayCount30360` with the maturity option, so the ISDA
+ * Feb-maturity exception is applied exactly once, at the true period close.
+ * This decomposition is additive by construction.
  *
- * Additivity strategy (guaranteed by construction, no compensating deltas):
- *   - Every intermediate sub-strip [cᵢ₋₁, cᵢ) is measured half-open via
- *     `dayCount30360Raw` WITHOUT the Feb-maturity option; applying that
- *     option to a sub-strip would break additivity because the adjustment
- *     belongs to the inclusive closing of the final strip.
- *   - The final sub-strip [cₖ, accrualEnd] is measured inclusively via
- *     `dayCount30360` WITH the loan maturity option, so the ISDA Feb-maturity
- *     exception is applied exactly once, at the period's true close.
- *
- *   raw(a, c₁) + raw(c₁, c₂) + … + dayCount30360(cₖ, e, {maturity})
- *     = dayCount30360(a, e, {maturity}).
- *
- * A rate change whose effectiveFrom equals accrualEnd is excluded (strict `<`)
- * so that the new rate takes effect in the following period. Including it
- * would force the final inclusive strip to have zero days and would drop the
- * closing day from accrual.
+ * A rate change effective on accrualEnd is excluded (strict `<`) so the new
+ * rate applies to the following period; otherwise the final inclusive strip
+ * would collapse to zero days and drop the closing day from accrual.
  */
 function interestAccrued(
   principal: number,
@@ -147,15 +134,11 @@ function interestAccrued(
 }
 
 /**
- * Pure, deterministic schedule generator; no I/O, no side effects.
+ * Pure, deterministic schedule generator; no I/O.
  *
- * Day count: 30E/360 ISDA with end-of-month normalization.
- * Rate changes within a period are handled by splitting the period at each
- * rate boundary and summing the resulting interest sub-amounts, using an
- * additive decomposition that preserves the full-month and Feb-maturity rules.
- *
- * Rounding: intermediate values use roundCalc (10 dp); every field written
- * into a ScheduleEntry uses roundMoney (2 dp). See src/utils/math.ts.
+ * Day count is 30E/360 ISDA. Intermediate math uses roundCalc (10 dp) and
+ * every persisted ScheduleEntry field uses roundMoney (2 dp); see
+ * src/utils/math.ts for the rationale.
  */
 export function generateSchedule(
   principal: number,

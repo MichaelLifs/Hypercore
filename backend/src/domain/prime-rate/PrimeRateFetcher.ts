@@ -1,41 +1,21 @@
 import axios from 'axios';
 
-/**
- * One row from the FRED prime-rate history before it is persisted as loan rate
- * segments. Unlike schedule computation segments, each row has an exclusive end
- * date (or null when still current).
- */
 export interface FetchedPrimeRateSegment {
-  /** ISO date string: YYYY-MM-DD */
   effectiveFrom: string;
-  /** ISO date string or null for the most recent segment */
+  /** Exclusive upper bound; null for the open-ended current segment. */
   effectiveTo: string | null;
-  /** Annual rate as a decimal fraction, e.g. 0.0850 */
+  /** Decimal fraction (0.0850 = 8.50%). */
   annualRate: number;
 }
 
-/**
- * FRED's public CSV export for the Bank Prime Loan Rate series.
- * No API key required. Returns two columns: date + PRIME (historically
- * "DATE,PRIME"; FRED may use "observation_date,PRIME").
- * PRIME is the rate in percent (e.g. 8.5 for 8.5%).
- * Missing observations are represented as ".".
- */
+// FRED's public CSV export for the Bank Prime Loan Rate series (no API key).
+// Missing observations are represented as ".". Percent values (e.g. 8.5).
 const FRED_CSV_URL = 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=PRIME';
 
-/**
- * FRED CSV allowed headers (uppercase). Guarded against because an HTML error
- * page from FRED (rate limit, maintenance) would otherwise silently parse to
- * "no valid observations" and surface a misleading error.
- */
+// Explicit allow-list so that an HTML error page from FRED (rate limit /
+// maintenance) fails loudly instead of silently yielding "no observations".
 const ALLOWED_HEADERS = new Set(['DATE,PRIME', 'OBSERVATION_DATE,PRIME']);
 
-/**
- * Parses the FRED prime rate CSV into chronologically ordered rate segments.
- *
- * Exported for unit testing; this is the only stateful-free piece worth
- * testing in isolation.
- */
 export function parsePrimeRateCsv(csv: string): FetchedPrimeRateSegment[] {
   const lines = csv.trim().split('\n');
 
@@ -80,21 +60,10 @@ export function parsePrimeRateCsv(csv: string): FetchedPrimeRateSegment[] {
   }));
 }
 
-/**
- * In-memory cache for the FRED prime rate history.
- *
- * Motivation: every simulateLoan and createLoan used to round-trip to FRED,
- * which is both a scalability cost (spamming an external public endpoint) and
- * a reliability bomb (FRED downtime → the entire write path fails).
- *
- * Strategy:
- *   - Fresh cache (age < FRED_CACHE_TTL_MS) is served directly.
- *   - An inflight promise is shared so concurrent callers never trigger more
- *     than one outbound request.
- *   - On HTTP failure, if we have ANY previously cached value we return the
- *     last-good snapshot instead of 500-ing. The app stays usable through
- *     short FRED outages at the cost of slightly stale rates.
- */
+// Without caching, every simulate/create would round-trip to FRED, coupling
+// the write path to an external public endpoint. Concurrent callers share an
+// inflight promise, and a transport failure falls back to the last-good
+// snapshot so transient FRED outages don't break the app.
 interface FredCacheEntry {
   segments: FetchedPrimeRateSegment[];
   fetchedAt: number;
@@ -122,16 +91,6 @@ async function fetchFromFred(): Promise<FetchedPrimeRateSegment[]> {
   return parsePrimeRateCsv(data);
 }
 
-/**
- * Fetches the full prime rate history from FRED and returns it as a
- * chronologically ordered array of non-overlapping rate segments.
- *
- * Rate source: FRED "Bank Prime Loan Rate" (series PRIME).
- * Approach: public CSV export (stable, machine-readable, no API key needed).
- *
- * Caches results for FRED_CACHE_TTL_MS. Falls back to the last-good snapshot
- * on transport failure so the app stays usable when FRED is unreachable.
- */
 export async function fetchPrimeRateSegments(): Promise<FetchedPrimeRateSegment[]> {
   const now = Date.now();
   if (fredCache && now - fredCache.fetchedAt < FRED_CACHE_TTL_MS) {
@@ -147,7 +106,6 @@ export async function fetchPrimeRateSegments(): Promise<FetchedPrimeRateSegment[
       return segments;
     } catch (cause) {
       if (fredCache) {
-        // Serve stale rather than failing the request outright.
         // eslint-disable-next-line no-console
         console.warn(
           '[PrimeRateFetcher] FRED fetch failed; serving last-good snapshot ' +

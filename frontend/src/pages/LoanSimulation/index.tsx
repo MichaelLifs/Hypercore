@@ -7,6 +7,7 @@ import { ScheduleTable } from '../LoanDetail/ScheduleTable';
 import { NewLoanModal } from '../LoanList/NewLoanModal';
 import { SIMULATE_LOAN } from '../../graphql/operations/loans';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { userFacingErrorMessage } from '../../utils/graphqlError';
 
 interface RateSegmentSnapshot {
   effectiveFrom: string;
@@ -90,7 +91,6 @@ export function LoanSimulationPage() {
   const result = data?.simulateLoan ?? null;
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // The earliest valid end date is one day after the selected start date.
   const minEndDate = React.useMemo(() => {
     if (!form.startDate) return undefined;
     const d = new Date(form.startDate + 'T00:00:00');
@@ -102,7 +102,8 @@ export function LoanSimulationPage() {
     const value = e.target.value;
     setForm((prev) => {
       const next = { ...prev, [field]: value };
-      // Clear end date when start date moves past it to avoid a silently invalid range.
+      // Dropping endDate here prevents the submit from silently failing with
+      // an inverted range if the user only touched startDate.
       if (field === 'startDate' && prev.endDate && value >= prev.endDate) {
         next.endDate = '';
       }
@@ -113,7 +114,6 @@ export function LoanSimulationPage() {
     }
   };
 
-  // Strip non-numeric characters while typing; format on blur.
   const handlePrincipalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^\d.]/g, '');
     setForm((prev) => ({ ...prev, principal: raw }));
@@ -243,7 +243,7 @@ export function LoanSimulationPage() {
           <ErrorBanner role="alert">
             <ErrorIcon aria-hidden />
             <div>
-              <strong>Simulation failed.</strong> {error.message}
+              <strong>Simulation failed.</strong> {userFacingErrorMessage(error)}
             </div>
           </ErrorBanner>
         )}

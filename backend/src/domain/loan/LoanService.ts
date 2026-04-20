@@ -14,7 +14,7 @@ export interface CreateLoanInput {
   principal: number;
   startDate: string;
   endDate: string;
-  /** Optional rate snapshot passed through from a prior simulateLoan call. */
+  /** Snapshot returned by a prior simulateLoan; pinned to reproduce the preview exactly. */
   rateSegments?: FetchedPrimeRateSegment[];
 }
 
@@ -25,7 +25,6 @@ export interface PaginatedLoans {
   pageSize: number;
 }
 
-/** Optional filters for the paginated loans list (all fields optional). */
 export interface LoanListFilter {
   search?: string | null;
   startDateFrom?: string | null;
@@ -46,12 +45,13 @@ export type LoanSortField =
 
 export type LoanSortOrder = 'ASC' | 'DESC';
 
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
-
 const MAX_TERM_YEARS = 50;
 const MAX_RATE_SEGMENTS_INPUT = 20;
+
+// Sanity cap for client-supplied rate snapshots. US prime has never exceeded
+// ~22% historically; 50% leaves headroom while rejecting obviously abusive
+// values (without this, a client could mint a loan at 10000%).
+const MAX_ANNUAL_RATE = 0.5;
 
 function assertValidPrincipal(principal: number): void {
   if (!Number.isFinite(principal) || principal <= 0) {
@@ -75,10 +75,6 @@ function assertValidLoanDates(startDate: string, endDate: string): void {
   }
 }
 
-/**
- * Domain validation for loan creation inputs (GraphQL validation is not sufficient).
- * Call before persisting or building rate/schedule data.
- */
 export function assertValidCreateLoanInput(input: CreateLoanInput): void {
   if (input.name.trim().length === 0) {
     throw new RangeError('Loan name must not be empty');
@@ -98,24 +94,41 @@ function assertSortedFetchedSegments(segments: FetchedPrimeRateSegment[]): void 
   }
 }
 
+// Applied to both FRED data (defence in depth) and client-supplied snapshots
+// (the real attack surface, since createLoan accepts `rateSegments`).
+function assertValidFetchedSegmentValues(segments: FetchedPrimeRateSegment[]): void {
+  for (const s of segments) {
+    parseIsoDateStrict(s.effectiveFrom);
+    if (s.effectiveTo !== null) {
+      parseIsoDateStrict(s.effectiveTo);
+      if (compareIso(s.effectiveTo, s.effectiveFrom) <= 0) {
+        throw new RangeError(
+          `rateSegment effectiveTo (${s.effectiveTo}) must be strictly after effectiveFrom (${s.effectiveFrom})`,
+        );
+      }
+    }
+    if (!Number.isFinite(s.annualRate) || s.annualRate < 0) {
+      throw new RangeError('each rateSegment must have a finite non-negative annualRate');
+    }
+    if (s.annualRate > MAX_ANNUAL_RATE) {
+      throw new RangeError(
+        `rateSegment annualRate ${s.annualRate} exceeds the permitted maximum of ${MAX_ANNUAL_RATE}`,
+      );
+    }
+  }
+}
+
 /**
- * Filters the full FRED rate history to only segments that overlap [startDate, endDate].
- *
- * A segment overlaps when:
- *   - its effectiveFrom is on or before endDate, AND
- *   - its effectiveTo is after startDate (or it is open-ended)
- *
- * The schedule generator requires the first segment to cover startDate
- * (i.e. its effectiveFrom must be on or before startDate). This is validated
- * explicitly so callers receive a clear error if FRED data predates the loan start.
- *
- * Exported for unit testing.
+ * Narrows the full rate history to segments overlapping [startDate, endDate].
+ * The schedule generator requires the first segment to cover startDate, so we
+ * surface a clear error when upstream data predates the loan start.
  */
 export function filterSegmentsForLoan(
   allSegments: FetchedPrimeRateSegment[],
   startDate: string,
   endDate: string,
 ): FetchedPrimeRateSegment[] {
+  assertValidFetchedSegmentValues(allSegments);
   assertSortedFetchedSegments(allSegments);
 
   const relevant = allSegments.filter(
@@ -140,10 +153,6 @@ export function filterSegmentsForLoan(
   return relevant;
 }
 
-// ---------------------------------------------------------------------------
-// Simulation
-// ---------------------------------------------------------------------------
-
 export interface SimulateLoanInput {
   principal: number;
   startDate: string;
@@ -161,15 +170,9 @@ export interface LoanSimulationResult {
   rateSegments: FetchedPrimeRateSegment[];
 }
 
-/**
- * Runs the full schedule-generation pipeline (FRED fetch → filter → generate)
- * without touching the database.
- *
- * If `providedSegments` is supplied, it is used verbatim instead of fetching
- * FRED. This lets `createLoan` accept a snapshot returned by `simulateLoan`
- * so that the persisted schedule matches the preview exactly, even if FRED
- * has updated between calls.
- */
+// When `providedSegments` is passed, FRED is not consulted. This lets
+// createLoan pin the preview snapshot so the persisted schedule matches the
+// preview exactly even if FRED has updated between simulate and create.
 async function buildLoanScheduleData(
   principal: number,
   startDate: string,
@@ -193,10 +196,6 @@ async function buildLoanScheduleData(
   return { schedule, totalExpectedInterest, rateSegments };
 }
 
-/**
- * Previews a repayment schedule using real prime-rate data from FRED.
- * Pure computation; nothing is written to the database.
- */
 export async function simulateLoan(input: SimulateLoanInput): Promise<LoanSimulationResult> {
   assertValidPrincipal(input.principal);
   assertValidLoanDates(input.startDate, input.endDate);
@@ -219,18 +218,9 @@ export async function simulateLoan(input: SimulateLoanInput): Promise<LoanSimula
   };
 }
 
-// ---------------------------------------------------------------------------
-// Persistence
-// ---------------------------------------------------------------------------
-
-/**
- * Precomputed-interest storage, keyed by the Loan entity instance.
- *
- * Using a WeakMap (instead of augmenting the entity with a non-column field
- * and testing `'totalExpectedInterest' in parent`) keeps the entity shape
- * clean, avoids a silent failure mode if a real column of that name is ever
- * added, and doesn't leak the cache beyond a single request lifetime.
- */
+// WeakMap (rather than augmenting the entity) keeps the entity shape clean
+// and avoids a silent collision if a real column of that name is ever added.
+// Entries are released with the entity, so the cache is per-request.
 const precomputedInterestByLoan = new WeakMap<Loan, number>();
 
 export function getPrecomputedInterest(loan: Loan): number | undefined {
@@ -241,15 +231,8 @@ export function setPrecomputedInterest(loan: Loan, value: number): void {
   precomputedInterestByLoan.set(loan, value);
 }
 
-/**
- * Validates input, optionally fetches the current prime rate history (only if
- * the caller didn't pass a snapshot), generates the full repayment schedule,
- * and persists the loan, its rate snapshot, and the repayment entries in a
- * single transaction.
- *
- * The rate snapshot stored in loan_rate_segments is immutable after creation;
- * it is never re-fetched when reading a loan later.
- */
+// The rate snapshot persisted in loan_rate_segments is immutable after
+// creation; schedule reads never re-fetch from FRED.
 export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   assertValidCreateLoanInput(input);
 
@@ -302,7 +285,6 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   return loan;
 }
 
-/** Excludes interest sort: pagination with joins requires ORDER BY without `.` (TypeORM distinct-id path). */
 const LOAN_SORT_COLUMN: Record<Exclude<LoanSortField, 'TOTAL_EXPECTED_INTEREST'>, string> = {
   CREATED_AT: 'loan.createdAt',
   NAME: 'loan.name',
@@ -311,10 +293,6 @@ const LOAN_SORT_COLUMN: Record<Exclude<LoanSortField, 'TOTAL_EXPECTED_INTEREST'>
   END_DATE: 'loan.endDate',
 };
 
-/**
- * Returns a paginated list of loans, with totalExpectedInterest pre-computed
- * for all loans on the page in a single aggregation query (avoids N+1).
- */
 export async function getLoans(
   page: number,
   pageSize: number,
@@ -373,7 +351,7 @@ export async function getLoans(
   if (field !== 'CREATED_AT') {
     qb.addOrderBy('loan.createdAt', 'DESC');
   }
-  // Ensure stable ordering across pages when many rows share the same sort key.
+  // Stable tiebreaker so pages don't shuffle when many rows share the sort key.
   qb.addOrderBy('loan.id', 'DESC');
 
   const total = await qb.clone().getCount();
@@ -394,31 +372,41 @@ export async function getLoanById(id: string): Promise<Loan | null> {
 }
 
 /**
- * Deletes a loan and all associated rate segments and repayment entries in a
- * single transaction. Returns `true` when the loan was found and removed,
- * `false` when no loan with the given id exists.
- *
- * Child rows are deleted explicitly before the parent because SQLite does not
- * enforce FK constraints unless `PRAGMA foreign_keys = ON` is set, and this
- * DataSource does not set it.
+ * Deletes loans with explicit child-first ordering in a single transaction.
+ * SQLite does not enforce FK cascades unless `PRAGMA foreign_keys = ON`, which
+ * this DataSource does not set; a previous cascade-based implementation
+ * silently orphaned rate_segments and repayment_entries rows.
  */
-export async function deleteLoan(id: string): Promise<boolean> {
-  const repo = AppDataSource.getRepository(Loan);
-  const loan = await repo.findOne({ where: { id } });
-  if (!loan) return false;
+export async function deleteLoansByIds(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
 
-  await AppDataSource.transaction(async (em) => {
-    await em.createQueryBuilder().delete().from(RepaymentEntry).where('loanId = :id', { id }).execute();
-    await em.createQueryBuilder().delete().from(LoanRateSegment).where('loanId = :id', { id }).execute();
-    await em.delete(Loan, { id });
+  return AppDataSource.transaction(async (em) => {
+    await em
+      .createQueryBuilder()
+      .delete()
+      .from(RepaymentEntry)
+      .where('loanId IN (:...ids)', { ids })
+      .execute();
+    await em
+      .createQueryBuilder()
+      .delete()
+      .from(LoanRateSegment)
+      .where('loanId IN (:...ids)', { ids })
+      .execute();
+    const result = await em
+      .createQueryBuilder()
+      .delete()
+      .from(Loan)
+      .where('id IN (:...ids)', { ids })
+      .execute();
+    return result.affected ?? 0;
   });
-
-  return true;
 }
 
-// ---------------------------------------------------------------------------
-// Portfolio aggregates
-// ---------------------------------------------------------------------------
+export async function deleteLoan(id: string): Promise<boolean> {
+  const affected = await deleteLoansByIds([id]);
+  return affected > 0;
+}
 
 export interface PortfolioSummary {
   totalLoans: number;
@@ -429,22 +417,14 @@ export interface PortfolioSummary {
   nextMaturity: Loan | null;
 }
 
-/**
- * Aggregate portfolio figures computed in SQL so they are correct for
- * portfolios of any size. Previously the frontend computed these over the
- * first 100 loans returned by `loans(page: 1, pageSize: 100)`, silently
- * wrong for larger portfolios.
- */
 export async function getPortfolioSummary(): Promise<PortfolioSummary> {
-  // UTC to match every other date in the domain (loan start/end, rate
-  // segments, schedule entries) which are ISO calendar dates with no timezone.
-  // Using local time here made nextMaturity replica-dependent around midnight.
+  // UTC to match every other date in the domain (loan dates, rate segments,
+  // schedule entries are ISO calendar dates). Local time made nextMaturity
+  // replica-dependent around midnight.
   const todayIso = new Date().toISOString().slice(0, 10);
 
-  // Single transaction so all three queries see a consistent snapshot.
-  // Without this, a createLoan arriving between queries produces aggregates
-  // that don't add up (e.g. totalLoans counts the new loan but totalExpectedInterest
-  // doesn't yet include its schedule rows).
+  // Single transaction so the aggregates agree; otherwise a concurrent
+  // createLoan can land between the count and the sum queries.
   return AppDataSource.transaction(async (em) => {
     const loanAgg = await em
       .createQueryBuilder(Loan, 'l')
@@ -492,15 +472,8 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Fetches SUM(interest) grouped by loanId in a single query and attaches the
- * result (via a WeakMap) so the GraphQL field resolver can return it without
- * issuing one query per loan.
- */
+// Precomputes SUM(interest) per loan in one grouped query so the
+// totalExpectedInterest field resolver avoids N+1.
 async function precomputeTotalInterest(loans: Loan[]): Promise<void> {
   const loanIds = loans.map((l) => l.id);
 

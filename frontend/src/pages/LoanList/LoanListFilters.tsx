@@ -149,8 +149,6 @@ export function LoanListFilters({ values, onChange, onClear, hasActiveFilters }:
   );
 }
 
-/* ─── styled ─── */
-
 const Wrap = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing.lg};
 `;

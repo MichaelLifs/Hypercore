@@ -11,8 +11,6 @@ import {
 } from '../../graphql/operations/test';
 import { GET_LOANS, GET_PORTFOLIO_SUMMARY } from '../../graphql/operations/loans';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface TestCaseResult {
   fullName: string;
   status: string;
@@ -69,13 +67,6 @@ interface FrontendTestResultData {
   };
 }
 
-// ─── Suite breakdown ──────────────────────────────────────────────────────────
-
-/**
- * Renders suites as collapsible sections open by default, each test on its own
- * row with an inline PASS / FAIL badge. Clicking the header toggles it.
- * The test name IS the description — it comes directly from the `it('...')` string.
- */
 function SuiteBreakdown({ suites }: { suites: TestSuiteResult[] }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
@@ -136,8 +127,6 @@ function SuiteBreakdown({ suites }: { suites: TestSuiteResult[] }) {
   );
 }
 
-// ─── Shared test result panel ─────────────────────────────────────────────────
-
 interface TestResultPanelProps {
   success: boolean;
   passed: number;
@@ -183,7 +172,6 @@ function TestResultPanel({
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
 
 export function TestPage() {
   const apolloClient = useApolloClient();
@@ -402,7 +390,6 @@ export function TestPage() {
   );
 }
 
-// ─── Styled components ────────────────────────────────────────────────────────
 
 const Container = styled.div`
   max-width: 1200px;
@@ -500,7 +487,6 @@ const RunningNote = styled.p`
   margin: 0;
 `;
 
-// ─── Result block ─────────────────────────────────────────────────────────────
 
 const ResultBlock = styled.div`
   display: flex;
@@ -579,7 +565,6 @@ const LabelChip = styled.span`
   font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
 `;
 
-// ─── Suite breakdown ──────────────────────────────────────────────────────────
 
 const SuiteList = styled.div`
   display: flex;

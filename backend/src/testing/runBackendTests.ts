@@ -2,14 +2,12 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
-/** One assertion (individual `it`) inside a test suite. */
 export interface TestCaseResult {
   fullName: string;
   status: 'passed' | 'failed' | 'pending' | 'skipped';
   failureMessages: string[];
 }
 
-/** One test file and its individual assertions. */
 export interface TestSuiteResult {
   suiteName: string;
   passed: boolean;
@@ -34,7 +32,8 @@ export interface BackendTestResult {
 
 const BACKEND_ROOT = path.resolve(__dirname, '..', '..');
 const JEST_BIN = path.join(BACKEND_ROOT, 'node_modules', 'jest', 'bin', 'jest.js');
-/** Absolute path used for reading; relative flag used in the CLI arg (avoids Windows backslash issues). */
+// Absolute path for reading; relative for the CLI arg (Windows backslashes
+// upset jest's quoting when the path is passed as a flag).
 const OUTPUT_FILE = path.join(BACKEND_ROOT, '.jest-output.json');
 const OUTPUT_FILE_FLAG = '.jest-output.json';
 const JEST_TIMEOUT_MS = 120_000;
@@ -103,15 +102,11 @@ function collectFailureMessages(output: JestJsonOutput): string[] {
   return messages;
 }
 
-/**
- * Spawns jest with `--outputFile` so the JSON report is written to a temp
- * file rather than captured from stdout. This is the reliable cross-platform
- * approach — stdout capture is fragile on Windows when spawning Node children.
- */
+// Uses `--outputFile` rather than stdout capture because stdout is unreliable
+// when spawning Node children on Windows.
 export async function runBackendTests(): Promise<BackendTestResult> {
   const startedAt = Date.now();
 
-  // Remove stale output so we can detect a fresh write.
   try { fs.unlinkSync(OUTPUT_FILE); } catch { /* first run */ }
 
   return new Promise<BackendTestResult>((resolve) => {
@@ -132,7 +127,7 @@ export async function runBackendTests(): Promise<BackendTestResult> {
     );
 
     const stderrChunks: Buffer[] = [];
-    child.stdout.on('data', () => {}); // drain
+    child.stdout.on('data', () => {});
     child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
     const killTimer = setTimeout(() => { child.kill('SIGKILL'); }, JEST_TIMEOUT_MS);

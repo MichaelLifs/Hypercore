@@ -15,10 +15,9 @@ export interface FrontendTestResult {
 }
 
 const FRONTEND_ROOT = path.resolve(__dirname, '..', '..', '..', 'frontend');
-/** Use vitest.mjs directly — avoids .cmd shim / shell:true issues on Windows. */
+// Invoke vitest.mjs directly to avoid .cmd / shell:true quirks on Windows.
 const VITEST_BIN = path.join(FRONTEND_ROOT, 'node_modules', 'vitest', 'vitest.mjs');
 const OUTPUT_FILE = path.join(FRONTEND_ROOT, '.vitest-output.json');
-/** Relative flag passed to vitest CLI — avoids Windows backslash issues. */
 const OUTPUT_FILE_FLAG = '.vitest-output.json';
 const VITEST_TIMEOUT_MS = 120_000;
 const FAILURE_MESSAGE_MAX_CHARS = 600;
@@ -33,11 +32,7 @@ function truncate(msg: string, max: number): string {
   return clean.length > max ? `${clean.slice(0, max)}…` : clean;
 }
 
-/**
- * Vitest v2 JSON reporter emits the same shape as Jest's --json:
- *   testResults[].name          – file path
- *   testResults[].assertionResults[]  – individual test cases
- */
+// Vitest v2 --reporter=json emits the same shape as Jest's --json.
 interface JestCompatAssertion {
   fullName?: string;
   status: string;
@@ -73,10 +68,6 @@ function buildSuites(output: JestCompatOutput): TestSuiteResult[] {
   });
 }
 
-/**
- * Spawns `node vitest.mjs run` from the frontend directory using the same
- * --outputFile pattern as the backend Jest runner — reliable cross-platform.
- */
 export async function runFrontendTests(): Promise<FrontendTestResult> {
   const startedAt = Date.now();
 
@@ -101,7 +92,7 @@ export async function runFrontendTests(): Promise<FrontendTestResult> {
     );
 
     const stderrChunks: Buffer[] = [];
-    child.stdout.on('data', () => {}); // drain
+    child.stdout.on('data', () => {});
     child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
     const killTimer = setTimeout(() => { child.kill('SIGKILL'); }, VITEST_TIMEOUT_MS);

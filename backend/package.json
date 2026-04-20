@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-schemas.js",
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",

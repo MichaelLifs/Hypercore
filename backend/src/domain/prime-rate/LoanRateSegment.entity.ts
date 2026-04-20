@@ -2,9 +2,9 @@ import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeor
 import { Loan } from '../loan/Loan.entity';
 
 /**
- * One prime rate segment as fetched from FRED at loan creation time.
- * effectiveTo is null for the most recent (open-ended) segment.
- * Rate is snapshotted at creation so schedule generation is deterministic.
+ * Snapshot of a prime-rate segment at loan creation time. effectiveTo is null
+ * for the open-ended (current) segment. Snapshotting guarantees deterministic
+ * schedule reads even after FRED publishes a new rate.
  */
 @Entity('loan_rate_segments')
 @Index('idx_rate_segment_loan', ['loanId'])
@@ -18,15 +18,15 @@ export class LoanRateSegment {
   @ManyToOne(() => Loan, (loan) => loan.rateSegments, { onDelete: 'CASCADE' })
   loan!: Loan;
 
-  /** ISO date string: first day this rate was in effect (inclusive) */
+  /** ISO date; inclusive lower bound. */
   @Column('text')
   effectiveFrom!: string;
 
-  /** ISO date string: first day this rate was no longer in effect (exclusive), or null if still current */
+  /** ISO date; exclusive upper bound. Null for the open-ended current segment. */
   @Column('text', { nullable: true })
   effectiveTo!: string | null;
 
-  /** Annual rate as a decimal fraction, e.g. 0.0850 for 8.50% */
+  /** Decimal fraction (0.0850 = 8.50%). */
   @Column('real')
   annualRate!: number;
 }

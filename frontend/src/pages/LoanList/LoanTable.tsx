@@ -245,8 +245,6 @@ export function LoanTable({
   );
 }
 
-/* ─── Table shell ─── */
-
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
@@ -256,8 +254,6 @@ const Table = styled.table`
   box-shadow: ${({ theme }) => theme.shadow.sm};
   overflow: hidden;
 `;
-
-/* ─── Headers ─── */
 
 const Th = styled.th<{ $numeric?: boolean }>`
   padding: 14px ${({ theme }) => theme.spacing.md};
@@ -309,8 +305,6 @@ const ThActions = styled(Th)`
   padding: 14px 8px;
 `;
 
-/* ─── Rows ─── */
-
 const Row = styled.tr<{ $deleting?: boolean }>`
   cursor: pointer;
   transition: background 0.18s ease, opacity 0.18s ease;
@@ -333,8 +327,6 @@ const Row = styled.tr<{ $deleting?: boolean }>`
     border-top: 1px solid ${({ theme }) => theme.colors.border};
   }
 `;
-
-/* ─── Cells ─── */
 
 const Td = styled.td`
   padding: 17px ${({ theme }) => theme.spacing.md};
@@ -372,8 +364,6 @@ const TdActions = styled.td`
   position: relative;
 `;
 
-/* ─── Kebab button ─── */
-
 const KebabButton = styled.button<{ $isOpen?: boolean }>`
   display: flex;
   align-items: center;
@@ -406,8 +396,6 @@ const KebabButton = styled.button<{ $isOpen?: boolean }>`
     opacity: 0.3 !important;
   }
 `;
-
-/* ─── Dropdown menu ─── */
 
 const DropdownMenu = styled.div`
   position: absolute;

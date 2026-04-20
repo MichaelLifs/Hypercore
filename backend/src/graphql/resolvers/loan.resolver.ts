@@ -26,10 +26,8 @@ import type { FetchedPrimeRateSegment } from '../../domain/prime-rate/PrimeRateF
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
-/**
- * Per-request context. DataLoaders are scoped to a single GraphQL request so
- * that batching windows are bounded and no cache persists across users.
- */
+// DataLoaders are scoped per request so batching windows are bounded and
+// caches never leak across users.
 export interface GraphQLContext {
   loaders: {
     repaymentScheduleByLoanId: DataLoader<string, RepaymentEntry[]>;
@@ -93,7 +91,7 @@ function toCreateLoanInput(
   };
 }
 
-export const loanResolvers = {
+export const coreResolvers = {
   Query: {
     loans: async (
       _: unknown,
@@ -148,7 +146,40 @@ export const loanResolvers = {
     deleteLoan: async (_: unknown, args: { id: string }) => {
       return deleteLoan(args.id);
     },
+  },
 
+  Loan: {
+    // Schema advertises String!; TypeORM stores Date. Without this the default
+    // serializer returns non-ISO Date.prototype.toString.
+    createdAt: (parent: Loan) => {
+      const d = parent.createdAt instanceof Date ? parent.createdAt : new Date(parent.createdAt);
+      return d.toISOString();
+    },
+
+    // Uses the precomputed WeakMap value (populated by list/create paths) and
+    // falls back to a per-request DataLoader for single-loan lookups.
+    totalExpectedInterest: async (parent: Loan, _args: unknown, ctx: GraphQLContext) => {
+      const precomputed = getPrecomputedInterest(parent);
+      if (precomputed !== undefined) {
+        return precomputed;
+      }
+      const total = await ctx.loaders.totalInterestByLoanId.load(parent.id);
+      setPrecomputedInterest(parent, total);
+      return total;
+    },
+
+    repaymentSchedule: async (parent: Loan, _args: unknown, ctx: GraphQLContext) => {
+      return ctx.loaders.repaymentScheduleByLoanId.load(parent.id);
+    },
+  },
+
+  PortfolioSummary: {},
+};
+
+// Dev-only surface: spawns processes, mutates data outside product flows,
+// exposes test infrastructure. Must stay behind `isDevToolsEnabled()`.
+export const devToolsResolvers = {
+  Mutation: {
     seedTestLoans: async (_: unknown, args: { clearFirst?: boolean | null }) => {
       return seedTestLoans(args.clearFirst === true);
     },
@@ -165,39 +196,26 @@ export const loanResolvers = {
       return runFrontendTests();
     },
   },
-
-  Loan: {
-    /**
-     * Date → ISO string. The entity stores a JS Date (TypeORM @CreateDateColumn)
-     * but the schema advertises `String!`. Without this resolver the default
-     * serializer returns the non-ISO Date.prototype.toString output.
-     */
-    createdAt: (parent: Loan) => {
-      const d = parent.createdAt instanceof Date ? parent.createdAt : new Date(parent.createdAt);
-      return d.toISOString();
-    },
-
-    /**
-     * Returns the pre-computed value when the parent loan was loaded by
-     * getLoans or createLoan (via the WeakMap in LoanService). Falls back to
-     * the per-request DataLoader for single-loan lookups.
-     */
-    totalExpectedInterest: async (parent: Loan, _args: unknown, ctx: GraphQLContext) => {
-      const precomputed = getPrecomputedInterest(parent);
-      if (precomputed !== undefined) {
-        return precomputed;
-      }
-      const total = await ctx.loaders.totalInterestByLoanId.load(parent.id);
-      setPrecomputedInterest(parent, total);
-      return total;
-    },
-
-    repaymentSchedule: async (parent: Loan, _args: unknown, ctx: GraphQLContext) => {
-      return ctx.loaders.repaymentScheduleByLoanId.load(parent.id);
-    },
-  },
-
-  PortfolioSummary: {
-    // nextMaturity is a Loan; let the Loan.* field resolvers kick in.
-  },
 };
+
+// Explicit BLM_ENABLE_DEV_TOOLS wins; otherwise on outside production.
+// Evaluated at bootstrap so a running process can't be flipped into dev mode.
+export function isDevToolsEnabled(): boolean {
+  const override = process.env.BLM_ENABLE_DEV_TOOLS;
+  if (override === 'true') return true;
+  if (override === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
+export function buildResolvers(): typeof coreResolvers & { Mutation: Record<string, unknown> } {
+  if (!isDevToolsEnabled()) {
+    return coreResolvers;
+  }
+  return {
+    ...coreResolvers,
+    Mutation: { ...coreResolvers.Mutation, ...devToolsResolvers.Mutation },
+  };
+}
+
+/** @deprecated Use `buildResolvers()`; retained for legacy test imports. */
+export const loanResolvers = buildResolvers();

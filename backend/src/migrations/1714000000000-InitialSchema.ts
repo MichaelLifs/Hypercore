@@ -1,10 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Captures the schema that was previously maintained by synchronize:true.
- * All statements use IF NOT EXISTS so this is safe to run against an
- * existing database that was set up under synchronize:true.
- */
+// Captures the schema formerly maintained by synchronize:true. Idempotent so
+// existing databases migrate cleanly.
 export class InitialSchema1714000000000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

@@ -10,13 +10,6 @@ function seg(
 }
 
 describe('filterSegmentsForLoan', () => {
-  /**
-   * Represents a simplified FRED-like history:
-   *   A  2020-01-01 → 2022-01-01  @ 3.25%
-   *   B  2022-01-01 → 2022-07-01  @ 3.50%
-   *   C  2022-07-01 → 2023-07-01  @ 5.50%
-   *   D  2023-07-01 → open-ended  @ 8.50%
-   */
   const history: FetchedPrimeRateSegment[] = [
     seg('2020-01-01', '2022-01-01', 0.0325),
     seg('2022-01-01', '2022-07-01', 0.035),
@@ -69,5 +62,48 @@ describe('filterSegmentsForLoan', () => {
 
     expect(result.every((s) => s.effectiveFrom !== '2020-01-01')).toBe(true);
     expect(result[0].effectiveFrom).toBe('2022-01-01');
+  });
+
+  it('rejects an absurd annual rate (> 50%)', () => {
+    const abusive = [seg('2020-01-01', null, 10)];
+    expect(() => filterSegmentsForLoan(abusive, '2024-01-01', '2024-06-30')).toThrow(
+      /exceeds the permitted maximum/i,
+    );
+  });
+
+  it('accepts the documented maximum (50%) exactly', () => {
+    const atMax = [seg('2020-01-01', null, 0.5)];
+    expect(() => filterSegmentsForLoan(atMax, '2024-01-01', '2024-06-30')).not.toThrow();
+  });
+
+  it('rejects a negative annual rate', () => {
+    const negative = [seg('2020-01-01', null, -0.01)];
+    expect(() => filterSegmentsForLoan(negative, '2024-01-01', '2024-06-30')).toThrow(
+      /non-negative annualRate/i,
+    );
+  });
+
+  it('rejects a non-finite annual rate (NaN)', () => {
+    const nanRate = [seg('2020-01-01', null, Number.NaN)];
+    expect(() => filterSegmentsForLoan(nanRate, '2024-01-01', '2024-06-30')).toThrow(
+      /finite non-negative annualRate/i,
+    );
+  });
+
+  it('rejects a malformed effectiveFrom ISO date', () => {
+    const bad = [seg('not-a-date', null, 0.05)];
+    expect(() => filterSegmentsForLoan(bad, '2024-01-01', '2024-06-30')).toThrow();
+  });
+
+  it('rejects a segment whose effectiveTo is on or before effectiveFrom', () => {
+    const zeroWidth = [seg('2024-01-01', '2024-01-01', 0.05)];
+    expect(() => filterSegmentsForLoan(zeroWidth, '2024-01-02', '2024-06-30')).toThrow(
+      /strictly after effectiveFrom/i,
+    );
+
+    const negativeWidth = [seg('2024-02-01', '2024-01-01', 0.05)];
+    expect(() => filterSegmentsForLoan(negativeWidth, '2024-03-01', '2024-06-30')).toThrow(
+      /strictly after effectiveFrom/i,
+    );
   });
 });

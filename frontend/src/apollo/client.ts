@@ -5,11 +5,8 @@ const httpLink = new HttpLink({
   uri: import.meta.env.VITE_GRAPHQL_URL ?? 'http://localhost:4000/graphql',
 });
 
-/**
- * Surface network/GraphQL errors in the console with a single, consistent
- * shape. Components still receive `error` from useQuery/useMutation and are
- * responsible for user-facing messaging; this link is purely for diagnostics.
- */
+// Diagnostics only; components still surface user-facing messages from the
+// hook-level error object.
 const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
   if (graphQLErrors) {
     for (const err of graphQLErrors) {
@@ -31,10 +28,8 @@ export const apolloClient = new ApolloClient({
   link: from([errorLink, httpLink]),
   cache: new InMemoryCache({
     typePolicies: {
-      /**
-       * Each (page, pageSize) combination is a distinct cache entry so that
-       * paging does not overwrite the previous page under `cache-and-network`.
-       */
+      // Each (page, pageSize) is a distinct cache entry so paging doesn't
+      // overwrite the previous page under cache-and-network.
       Query: {
         fields: {
           loans: {
@@ -42,11 +37,7 @@ export const apolloClient = new ApolloClient({
           },
         },
       },
-      /**
-       * PaginatedLoans has no `id`, so Apollo can't normalize it. Merging by
-       * replacement is correct because a new response for the same keyArgs
-       * supersedes the old one.
-       */
+      // PaginatedLoans has no id; replace on every response.
       PaginatedLoans: {
         keyFields: false,
       },
