@@ -21,9 +21,9 @@ Interest is computed against real U.S. prime rate history (FRED), with the rate 
 
 ## Key Concepts
 
-- **Bullet loans** — interest-only coupons; principal repaid in full at maturity.
-- **30E/360 ISDA day count** — used for all interest accrual, including the February-maturity edge case.
-- **Deterministic schedules** — the prime-rate history in effect at creation is pinned to the loan, so schedules never shift if the external feed changes later.
+- **Bullet loans**  interest-only coupons; principal repaid in full at maturity.
+- **30E/360 ISDA day count**  used for all interest accrual, including the February-maturity edge case.
+- **Deterministic schedules**  the prime-rate history in effect at creation is pinned to the loan, so schedules never shift if the external feed changes later.
 
 ## Running the project
 
