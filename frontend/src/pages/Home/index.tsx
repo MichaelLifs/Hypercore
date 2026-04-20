@@ -17,10 +17,12 @@ export function HomePage() {
       <Hero>
         <HeroCopy>
           <HeroEyebrow>Bullet Loan Management</HeroEyebrow>
-          <HeroTitle>Manage bullet loans with clarity and confidence.</HeroTitle>
+          <HeroTitle>
+            Model and manage bullet loans with precise, real-world interest calculations
+          </HeroTitle>
           <HeroLede>
-            Create loans, generate deterministic repayment schedules, and keep full visibility into
-            principal, interest, and maturity from a single, reliable surface.
+            Create loans, simulate schedules, and track principal and interest using real prime
+            rate data.
           </HeroLede>
           <HeroActions>
             <Button $size="lg" onClick={() => setModalOpen(true)}>

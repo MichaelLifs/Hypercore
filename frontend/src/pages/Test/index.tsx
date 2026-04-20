@@ -293,20 +293,17 @@ export function TestPage() {
             <CardTitle>Generate Loan Test Data</CardTitle>
             <CardDescription>
               Inserts a curated set of loans through the real <code>createLoan</code> pipeline.
-              Every scenario mirrors an edge case from the backend test suite — mid-month start,
+              Every scenario mirrors an edge case from the backend test suite  mid-month start,
               leap-year Feb 29, rate change on coupon date, zero-rate, start on the 31st, and more.
-              Loans are prefixed with <code>TEST -</code> so they can be cleared in one click.
+              Loans are prefixed with <code>TEST</code> so they can be cleared in one click.
             </CardDescription>
           </CardHeader>
 
           <ButtonRow>
             <Button onClick={() => handleSeed(false)} disabled={seeding || clearing}>
-              {seeding ? 'Seeding…' : 'Seed test loans'}
+              {seeding ? 'Creating…' : 'Create test loan'}
             </Button>
-            <Button $variant="secondary" onClick={() => handleSeed(true)} disabled={seeding || clearing}>
-              Reseed (clear first)
-            </Button>
-            <Button $variant="ghost" onClick={handleClear} disabled={seeding || clearing}>
+            <Button $variant="secondary" onClick={handleClear} disabled={seeding || clearing}>
               {clearing ? 'Clearing…' : 'Clear test loans'}
             </Button>
           </ButtonRow>
@@ -342,8 +339,8 @@ export function TestPage() {
             <CardEyebrow>Section 2</CardEyebrow>
             <CardTitle>Run Backend Tests</CardTitle>
             <CardDescription>
-              Spawns the backend jest suite out-of-process and parses the JSON report. Same as{' '}
-              <code>npm test</code> in <code>/backend</code>.
+              Spawns the backend Jest suite out-of-process and parses the JSON report for backend
+              tests.
             </CardDescription>
           </CardHeader>
 
@@ -354,7 +351,7 @@ export function TestPage() {
           </ButtonRow>
 
           {testingBackend && !backendResult && (
-            <RunningNote>Running — this usually takes a few seconds…</RunningNote>
+            <RunningNote>Running ... this usually takes a few seconds…</RunningNote>
           )}
 
           {backendResult && (
@@ -375,9 +372,7 @@ export function TestPage() {
             <CardEyebrow>Section 3</CardEyebrow>
             <CardTitle>Run Frontend Tests</CardTitle>
             <CardDescription>
-              Runs the Vitest suite in <code>/frontend/src/**/*.test.ts</code>. Covers formatters
-              (<code>formatCurrency</code>, <code>formatDate</code>, <code>formatPercent</code>) and
-              loan-form validation logic.
+              Runs the Vitest suite and parses the JSON report for frontend tests.
             </CardDescription>
           </CardHeader>
 
@@ -388,7 +383,7 @@ export function TestPage() {
           </ButtonRow>
 
           {testingFrontend && !frontendResult && (
-            <RunningNote>Running — this usually takes a few seconds…</RunningNote>
+            <RunningNote>Running ... this usually takes a few seconds…</RunningNote>
           )}
 
           {frontendResult && (

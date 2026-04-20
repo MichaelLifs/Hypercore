@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
+import toast from 'react-hot-toast';
 import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { Pagination } from '../../components/Pagination';
@@ -7,7 +8,7 @@ import { LoanTable } from './LoanTable';
 import type { LoanSortField, SortOrder } from './LoanTable';
 import type { LoanRow } from './LoanTable';
 import { NewLoanModal } from './NewLoanModal';
-import { GET_LOANS } from '../../graphql/operations/loans';
+import { DELETE_LOAN, GET_LOANS } from '../../graphql/operations/loans';
 import {
   LoanListFilters,
   defaultLoanListFilterValues,
@@ -75,6 +76,8 @@ export function LoanListPage() {
 
   const apolloClient = useApolloClient();
 
+  const [deleteLoan] = useMutation<{ deleteLoan: boolean }, { id: string }>(DELETE_LOAN);
+
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(filterValues.search.trim()), 400);
     return () => window.clearTimeout(id);
@@ -127,6 +130,16 @@ export function LoanListPage() {
     }
   };
 
+  const handleDeleteLoan = async (id: string) => {
+    try {
+      await deleteLoan({ variables: { id } });
+      toast.success('Loan deleted successfully');
+      void apolloClient.refetchQueries({ include: ['GetLoans', 'GetPortfolioSummary'] });
+    } catch {
+      toast.error('Failed to delete loan');
+    }
+  };
+
   const handleClearFilters = () => {
     setFilterValues(defaultLoanListFilterValues());
     setDebouncedSearch('');
@@ -172,6 +185,7 @@ export function LoanListPage() {
           sortBy={sortBy}
           sortOrder={sortOrder}
           onSort={handleSort}
+          onDeleteLoan={handleDeleteLoan}
           emptyHint={filtersActive ? 'filtered' : 'none'}
         />
       </TableScroll>

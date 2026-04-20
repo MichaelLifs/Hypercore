@@ -65,7 +65,14 @@ type PortfolioSummary {
   totalLoans: Int!
   totalPrincipal: Float!
   totalExpectedInterest: Float!
+  activeLoans: Int!
+  monthlyInterestTimeline: [MonthlyInterestPoint!]!
   nextMaturity: Loan
+}
+
+type MonthlyInterestPoint {
+  month: String!
+  interest: Float!
 }
 
 """
@@ -202,6 +209,8 @@ type FrontendTestResult {
 
 type Mutation {
   createLoan(input: CreateLoanInput!): Loan!
+  """Permanently deletes a loan and all its related rate segments and repayment entries."""
+  deleteLoan(id: ID!): Boolean!
   """
   Inserts a curated set of edge-case loans (mid-month start, leap Feb, rate
   change on coupon date, zero-rate, etc.) into the real database through the

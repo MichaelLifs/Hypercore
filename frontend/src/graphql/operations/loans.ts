@@ -58,10 +58,10 @@ export const GET_PORTFOLIO_SUMMARY = gql`
       totalLoans
       totalPrincipal
       totalExpectedInterest
-      nextMaturity {
-        id
-        name
-        endDate
+      activeLoans
+      monthlyInterestTimeline {
+        month
+        interest
       }
     }
   }
@@ -77,5 +77,11 @@ export const CREATE_LOAN = gql`
       endDate
       totalExpectedInterest
     }
+  }
+`;
+
+export const DELETE_LOAN = gql`
+  mutation DeleteLoan($id: ID!) {
+    deleteLoan(id: $id)
   }
 `;

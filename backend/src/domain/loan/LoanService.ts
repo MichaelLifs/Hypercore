@@ -373,6 +373,8 @@ export async function getLoans(
   if (field !== 'CREATED_AT') {
     qb.addOrderBy('loan.createdAt', 'DESC');
   }
+  // Ensure stable ordering across pages when many rows share the same sort key.
+  qb.addOrderBy('loan.id', 'DESC');
 
   const total = await qb.clone().getCount();
   const loans = await qb
@@ -391,6 +393,29 @@ export async function getLoanById(id: string): Promise<Loan | null> {
   return AppDataSource.getRepository(Loan).findOne({ where: { id } });
 }
 
+/**
+ * Deletes a loan and all associated rate segments and repayment entries in a
+ * single transaction. Returns `true` when the loan was found and removed,
+ * `false` when no loan with the given id exists.
+ *
+ * Child rows are deleted explicitly before the parent because SQLite does not
+ * enforce FK constraints unless `PRAGMA foreign_keys = ON` is set, and this
+ * DataSource does not set it.
+ */
+export async function deleteLoan(id: string): Promise<boolean> {
+  const repo = AppDataSource.getRepository(Loan);
+  const loan = await repo.findOne({ where: { id } });
+  if (!loan) return false;
+
+  await AppDataSource.transaction(async (em) => {
+    await em.createQueryBuilder().delete().from(RepaymentEntry).where('loanId = :id', { id }).execute();
+    await em.createQueryBuilder().delete().from(LoanRateSegment).where('loanId = :id', { id }).execute();
+    await em.delete(Loan, { id });
+  });
+
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Portfolio aggregates
 // ---------------------------------------------------------------------------
@@ -399,6 +424,8 @@ export interface PortfolioSummary {
   totalLoans: number;
   totalPrincipal: number;
   totalExpectedInterest: number;
+  activeLoans: number;
+  monthlyInterestTimeline: Array<{ month: string; interest: number }>;
   nextMaturity: Loan | null;
 }
 
@@ -430,6 +457,20 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
       .select('COALESCE(SUM(e.interest), 0)', 'interest')
       .getRawOne<{ interest: string | number }>();
 
+    const activeAgg = await em
+      .createQueryBuilder(Loan, 'l')
+      .select('COUNT(*)', 'count')
+      .where('l.endDate >= :today', { today: todayIso })
+      .getRawOne<{ count: string | number }>();
+
+    const monthlyInterestRows = await em
+      .createQueryBuilder(RepaymentEntry, 'e')
+      .select('SUBSTR(e.paymentDate, 1, 7)', 'month')
+      .addSelect('COALESCE(SUM(e.interest), 0)', 'interest')
+      .groupBy('SUBSTR(e.paymentDate, 1, 7)')
+      .orderBy('month', 'ASC')
+      .getRawMany<{ month: string; interest: string | number }>();
+
     const nextMaturity = await em
       .createQueryBuilder(Loan, 'l')
       .where('l.endDate >= :today', { today: todayIso })
@@ -441,6 +482,11 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
       totalLoans: Number(loanAgg?.count ?? 0),
       totalPrincipal: roundMoney(Number(loanAgg?.principal ?? 0)),
       totalExpectedInterest: roundMoney(Number(interestAgg?.interest ?? 0)),
+      activeLoans: Number(activeAgg?.count ?? 0),
+      monthlyInterestTimeline: monthlyInterestRows.map((row) => ({
+        month: row.month,
+        interest: roundMoney(Number(row.interest ?? 0)),
+      })),
       nextMaturity: nextMaturity ?? null,
     };
   });

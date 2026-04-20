@@ -4,6 +4,7 @@ import { Loan } from '../../domain/loan/Loan.entity';
 import { RepaymentEntry } from '../../domain/repayment/RepaymentEntry.entity';
 import {
   createLoan,
+  deleteLoan,
   simulateLoan,
   getLoans,
   type LoanListFilter,
@@ -142,6 +143,10 @@ export const loanResolvers = {
       },
     ) => {
       return createLoan(toCreateLoanInput(args));
+    },
+
+    deleteLoan: async (_: unknown, args: { id: string }) => {
+      return deleteLoan(args.id);
     },
 
     seedTestLoans: async (_: unknown, args: { clearFirst?: boolean | null }) => {

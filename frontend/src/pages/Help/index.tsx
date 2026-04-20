@@ -8,14 +8,28 @@ export function HelpPage() {
         <PageHeader>
           <PageTitle>Help &amp; Guide</PageTitle>
           <PageSubtitle>
-            Plain language on how this app models bullet loans, interest, and what each column in
-            the schedule means.
+            A quick guide to how this product models a <KeyTerm>Bullet Loan</KeyTerm>, calculates
+            {' '}
+            <KeyTerm>Interest</KeyTerm>, and explains each schedule column in plain language.
           </PageSubtitle>
+          <AnchorNav aria-label="Help sections">
+            {SECTION_LINKS.map((link) => (
+              <AnchorLink key={link.href} href={link.href}>
+                {link.label}
+              </AnchorLink>
+            ))}
+          </AnchorNav>
         </PageHeader>
 
-        <Section>
+        <Section id="overview">
           <SectionLabel>Overview</SectionLabel>
           <SectionTitle>How It Works</SectionTitle>
+          <SectionIntro>
+            Businesses often choose <KeyTerm>bullet loans</KeyTerm> when they need funding now and
+            expect larger cash inflows later, such as project completion, inventory turns, or asset
+            sales. This structure keeps periodic payments lighter during the term and concentrates
+            principal repayment at maturity.
+          </SectionIntro>
           <FlowGrid>
             {STEPS.map((step, i) => (
               <React.Fragment key={step.title}>
@@ -33,7 +47,7 @@ export function HelpPage() {
         </Section>
 
         <ContentGrid>
-          <InfoCard>
+          <InfoCard id="concept">
             <InfoCardTagRow>
               <InfoCardIcon aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -67,7 +81,7 @@ export function HelpPage() {
             </BulletList>
           </InfoCard>
 
-          <InfoCard>
+          <InfoCard id="calculation">
             <InfoCardTagRow>
               <InfoCardIcon aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -93,7 +107,7 @@ export function HelpPage() {
             </BulletList>
           </InfoCard>
 
-          <InfoCard $wide>
+          <InfoCard $wide id="schedule">
             <InfoCardTagRow>
               <InfoCardIcon aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -140,76 +154,84 @@ export function HelpPage() {
 
 const STEPS = [
   {
-    title: 'Create a loan',
+    title: 'Create the loan',
     description:
-      'Enter the loan name, principal amount, start date, and maturity date. No manual rate entry. The prime rate is fetched and locked in automatically.',
+      'Enter a name, start date, maturity date, and principal. The app automatically captures the market rate, so setup stays fast and consistent.',
   },
   {
-    title: 'Rate snapshot',
+    title: 'Lock the rate snapshot',
     description:
-      'The current Bank Prime Loan Rate is fetched from FRED and stored as a snapshot. This locks the rate history at creation time so the schedule is always reproducible.',
+      'We fetch Bank Prime Loan Rate data from FRED and store a snapshot at creation time. That snapshot keeps your results reproducible for audits, reviews, and team handoffs.',
   },
   {
-    title: 'Build the schedule',
+    title: 'Generate the schedule',
     description:
-      'A full repayment schedule is generated instantly, with one row per payment date. Interest accrues on a 30/360 basis, which is standard for bullet facilities.',
+      'The platform builds one row per payment date automatically. Interest accrues using the 30/360 convention, the standard approach for many bullet facilities.',
   },
   {
     title: 'Track to maturity',
     description:
-      "During the loan term you pay interest only. On maturity the full principal is due in a single bullet payment, together with that period's accrued interest.",
+      'During the term, payments are interest-only. On maturity, the full principal is paid in one bullet payment together with final-period interest.',
   },
 ];
 
 const BULLET_LOAN_POINTS = [
-  'Principal is due in full on the maturity date, not spread across the life of the loan.',
-  'Between start and maturity you pay interest each period. Principal does not amortize month to month.',
-  'The amount you owe stays flat until the balloon, then drops to zero after the final principal payment.',
-  'The last row is the big one: it carries the full principal plus the interest for that final period.',
+  'In a Bullet Loan, Principal is repaid in full on the maturity date, not gradually over time.',
+  'During the loan term, you typically pay Interest only, which helps protect near-term cash flow.',
+  'Outstanding Principal stays flat until maturity, then drops to zero after the final payment.',
+  'The last schedule row combines full Principal plus that final period of Interest.',
 ];
 
 const INTEREST_POINTS = [
-  'Accrual uses 30/360: every month counts as 30 days and every year as 360, which is standard for this type of facility.',
-  'For a fixed annual rate, monthly interest is approximately principal × rate ÷ 12.',
-  'The rate is fixed at the moment the loan is created. Future changes to the prime rate do not affect existing loans.',
-  'If the prime rate changed within your loan period, each rate is applied only for the days it was actually in effect.',
+  'Accrual uses 30/360: each month counts as 30 days and each year as 360 days.',
+  'For a fixed annual rate, monthly Interest is approximately Principal × rate ÷ 12.',
+  'The rate is snapshotted when the loan is created; later market changes do not rewrite existing schedules.',
+  'If rates changed during the covered period, each rate is applied only to the days it was active.',
 ];
 
 const SCHEDULE_COLUMNS = [
   {
     label: 'Payment Date',
-    desc: 'When this payment is due. One row per month from start date through maturity.',
+    desc: 'Due date for that row. The schedule includes one row per payment period from start through maturity.',
   },
   {
     label: 'Payment Type',
-    desc: 'Interest for monthly coupon payments; Principal & Interest for the final maturity row where the principal balloon is repaid.',
+    desc: 'Shows whether the row is Interest-only or the final Principal + Interest maturity payment.',
   },
   {
     label: 'Principal',
-    desc: '$0 on all interim dates. On the maturity row it shows the full principal amount coming due.',
+    desc: 'Usually $0 during the term. At maturity, it shows the full Principal amount due.',
   },
   {
     label: 'Interest',
-    desc: 'Interest accrued for that period, calculated using 30/360 at the rate locked in at loan creation.',
+    desc: 'Interest accrued for that period using the 30/360 day-count and the stored rate snapshot.',
   },
   {
     label: 'Total Payment',
-    desc: 'The amount due that period: interest only on interim dates, principal plus interest on the final row.',
+    desc: 'Total amount due on that date: Interest-only on interim rows, then Principal + Interest at maturity.',
   },
   {
     label: 'Remaining Balance',
-    desc: 'Outstanding principal after the payment is applied. Stays flat at the loan amount until the maturity row, where it drops to zero.',
+    desc: 'Outstanding Principal after payment. It remains flat through the term, then drops to zero at maturity.',
   },
+];
+
+const SECTION_LINKS = [
+  { label: 'Overview', href: '#overview' },
+  { label: 'Concept', href: '#concept' },
+  { label: 'Calculation', href: '#calculation' },
+  { label: 'Schedule', href: '#schedule' },
 ];
 
 const Page = styled.div`
   background: ${({ theme }) => theme.colors.background};
   min-height: calc(100vh - 64px);
   padding-bottom: ${({ theme }) => theme.spacing.xxl};
+  scroll-behavior: smooth;
 `;
 
 const Container = styled.div`
-  max-width: 1200px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: ${({ theme }) => theme.spacing.xxl} ${({ theme }) => theme.spacing.xl};
 
@@ -233,12 +255,49 @@ const PageTitle = styled.h1`
 const PageSubtitle = styled.p`
   font-size: ${({ theme }) => theme.typography.fontSize.md};
   color: ${({ theme }) => theme.colors.textSecondary};
-  line-height: ${({ theme }) => theme.typography.lineHeight.relaxed};
-  max-width: 560px;
+  line-height: 1.75;
+  max-width: 720px;
+`;
+
+const AnchorNav = styled.nav`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.spacing.sm};
+  margin-top: ${({ theme }) => theme.spacing.md};
+`;
+
+const AnchorLink = styled.a`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: ${({ theme }) => theme.radius.full};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  background: ${({ theme }) => theme.colors.surface};
+  text-decoration: none;
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.primary};
+    border-color: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => theme.colors.primaryLight};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.primary};
+    outline-offset: 2px;
+  }
 `;
 
 const Section = styled.section`
-  margin-bottom: ${({ theme }) => theme.spacing.xxl};
+  margin-bottom: calc(${({ theme }) => theme.spacing.xxl} + ${({ theme }) => theme.spacing.sm});
+  scroll-margin-top: 96px;
 `;
 
 const SectionLabel = styled.span`
@@ -256,6 +315,14 @@ const SectionTitle = styled.h2`
   font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
   color: ${({ theme }) => theme.colors.textPrimary};
   letter-spacing: -0.01em;
+  margin-bottom: ${({ theme }) => theme.spacing.lg};
+`;
+
+const SectionIntro = styled.p`
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  line-height: 1.75;
+  max-width: 780px;
   margin-bottom: ${({ theme }) => theme.spacing.lg};
 `;
 
@@ -278,6 +345,14 @@ const StepCard = styled.div`
   border-radius: ${({ theme }) => theme.radius.lg};
   padding: ${({ theme }) => theme.spacing.lg};
   box-shadow: ${({ theme }) => theme.shadow.sm};
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: ${({ theme }) => theme.shadow.md};
+  }
 
   @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
     width: 100%;
@@ -287,9 +362,9 @@ const StepCard = styled.div`
 const StepConnector = styled.div`
   flex-shrink: 0;
   align-self: center;
-  width: 32px;
+  width: 34px;
   height: 2px;
-  background: ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => `color-mix(in srgb, ${theme.colors.primary} 45%, ${theme.colors.border})`};
   position: relative;
 
   &::after {
@@ -299,7 +374,8 @@ const StepConnector = styled.div`
     top: -4px;
     width: 0;
     height: 0;
-    border-left: 7px solid ${({ theme }) => theme.colors.border};
+    border-left: 7px solid
+      ${({ theme }) => `color-mix(in srgb, ${theme.colors.primary} 45%, ${theme.colors.border})`};
     border-top: 5px solid transparent;
     border-bottom: 5px solid transparent;
   }
@@ -317,7 +393,8 @@ const StepConnector = styled.div`
       left: -4px;
       border-left: 5px solid transparent;
       border-right: 5px solid transparent;
-      border-top: 7px solid ${({ theme }) => theme.colors.border};
+      border-top: 7px solid
+        ${({ theme }) => `color-mix(in srgb, ${theme.colors.primary} 45%, ${theme.colors.border})`};
       border-bottom: none;
     }
   }
@@ -350,13 +427,13 @@ const StepTitle = styled.h3`
 const StepDescription = styled.p`
   font-size: ${({ theme }) => theme.typography.fontSize.sm};
   color: ${({ theme }) => theme.colors.textSecondary};
-  line-height: ${({ theme }) => theme.typography.lineHeight.relaxed};
+  line-height: 1.7;
 `;
 
 const ContentGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: ${({ theme }) => theme.spacing.lg};
+  gap: ${({ theme }) => theme.spacing.xl};
   margin-bottom: ${({ theme }) => theme.spacing.xxl};
 
   @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
@@ -370,6 +447,15 @@ const InfoCard = styled.div<{ $wide?: boolean }>`
   border-radius: ${({ theme }) => theme.radius.lg};
   padding: ${({ theme }) => theme.spacing.xl};
   box-shadow: ${({ theme }) => theme.shadow.sm};
+  scroll-margin-top: 96px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: ${({ theme }) => theme.shadow.md};
+  }
 
   ${({ $wide }) => $wide && 'grid-column: 1 / -1;'}
 
@@ -427,7 +513,7 @@ const BulletItem = styled.li`
   gap: ${({ theme }) => theme.spacing.sm};
   font-size: ${({ theme }) => theme.typography.fontSize.sm};
   color: ${({ theme }) => theme.colors.textSecondary};
-  line-height: ${({ theme }) => theme.typography.lineHeight.relaxed};
+  line-height: 1.7;
 `;
 
 const BulletDot = styled.span`
@@ -442,7 +528,7 @@ const BulletDot = styled.span`
 const ScheduleColumns = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: ${({ theme }) => theme.spacing.md};
+  gap: ${({ theme }) => theme.spacing.lg};
 
   @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
     grid-template-columns: 1fr 1fr;
@@ -458,19 +544,32 @@ const ScheduleColumnItem = styled.div`
   background: ${({ theme }) => theme.colors.background};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radius.md};
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    background: ${({ theme }) => theme.colors.surface};
+  }
 `;
 
 const ScheduleColumnLabel = styled.div`
-  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
   font-weight: ${({ theme }) => theme.typography.fontWeight.semibold};
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   color: ${({ theme }) => theme.colors.primary};
-  margin-bottom: ${({ theme }) => theme.spacing.xs};
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
 `;
 
 const ScheduleColumnDesc = styled.div`
   font-size: ${({ theme }) => theme.typography.fontSize.sm};
   color: ${({ theme }) => theme.colors.textSecondary};
-  line-height: ${({ theme }) => theme.typography.lineHeight.relaxed};
+  line-height: 1.7;
+`;
+
+const KeyTerm = styled.strong`
+  color: ${({ theme }) => theme.colors.primary};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.semibold};
 `;

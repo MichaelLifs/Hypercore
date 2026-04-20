@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useApolloClient, useLazyQuery } from '@apollo/client';
 import toast from 'react-hot-toast';
 import styled from 'styled-components';
@@ -81,15 +81,51 @@ export function LoanSimulationPage() {
     fetchPolicy: 'network-only',
     onCompleted: () => {
       toast.success('Simulation updated', { id: 'loan-simulation' });
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
     },
   });
 
   const result = data?.simulateLoan ?? null;
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // The earliest valid end date is one day after the selected start date.
+  const minEndDate = React.useMemo(() => {
+    if (!form.startDate) return undefined;
+    const d = new Date(form.startDate + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  }, [form.startDate]);
 
   const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    const value = e.target.value;
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      // Clear end date when start date moves past it to avoid a silently invalid range.
+      if (field === 'startDate' && prev.endDate && value >= prev.endDate) {
+        next.endDate = '';
+      }
+      return next;
+    });
     if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  // Strip non-numeric characters while typing; format on blur.
+  const handlePrincipalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/[^\d.]/g, '');
+    setForm((prev) => ({ ...prev, principal: raw }));
+    if (fieldErrors.principal) {
+      setFieldErrors((prev) => ({ ...prev, principal: undefined }));
+    }
+  };
+
+  const handlePrincipalBlur = () => {
+    const num = parseFloat(form.principal);
+    if (!isNaN(num)) {
+      setForm((prev) => ({ ...prev, principal: num.toLocaleString('en-US') }));
     }
   };
 
@@ -118,31 +154,41 @@ export function LoanSimulationPage() {
         <PageHeader>
           <PageTitle>Loan Simulation</PageTitle>
           <PageSubtitle>
-            Preview a real repayment schedule using current prime-rate data.
+            Enter a principal amount and term dates to instantly preview a full repayment
+            schedule interest calculated using current prime-rate data, no loan created.
           </PageSubtitle>
         </PageHeader>
 
         <InputCard>
+          <FormHint>
+            All fields are required. Dates must form a valid future range; the schedule
+            updates immediately on each run.
+          </FormHint>
           <Form onSubmit={handleSubmit}>
             <Fields>
               <Field>
                 <Label htmlFor="sim-principal">Principal</Label>
                 <InputGroup>
+                  <CurrencyPrefix aria-hidden>$</CurrencyPrefix>
                   <Input
                     id="sim-principal"
                     inputMode="decimal"
                     autoComplete="off"
                     placeholder="1,000,000"
                     value={form.principal}
-                    onChange={set('principal')}
+                    onChange={handlePrincipalChange}
+                    onBlur={handlePrincipalBlur}
                     $hasError={!!fieldErrors.principal}
                     aria-invalid={!!fieldErrors.principal}
-                    aria-describedby={fieldErrors.principal ? 'err-principal' : undefined}
+                    aria-describedby={
+                      fieldErrors.principal ? 'err-principal' : 'hint-principal'
+                    }
                   />
-                  <CurrencySuffix aria-hidden>$</CurrencySuffix>
                 </InputGroup>
-                {fieldErrors.principal && (
+                {fieldErrors.principal ? (
                   <FieldError id="err-principal" role="alert">{fieldErrors.principal}</FieldError>
+                ) : (
+                  <FieldHint id="hint-principal">Loan amount in USD</FieldHint>
                 )}
               </Field>
 
@@ -155,10 +201,12 @@ export function LoanSimulationPage() {
                   onChange={set('startDate')}
                   $hasError={!!fieldErrors.startDate}
                   aria-invalid={!!fieldErrors.startDate}
-                  aria-describedby={fieldErrors.startDate ? 'err-start' : undefined}
+                  aria-describedby={fieldErrors.startDate ? 'err-start' : 'hint-start'}
                 />
-                {fieldErrors.startDate && (
+                {fieldErrors.startDate ? (
                   <FieldError id="err-start" role="alert">{fieldErrors.startDate}</FieldError>
+                ) : (
+                  <FieldHint id="hint-start">Loan disbursement date</FieldHint>
                 )}
               </Field>
 
@@ -168,19 +216,23 @@ export function LoanSimulationPage() {
                   id="sim-end"
                   type="date"
                   value={form.endDate}
+                  min={minEndDate}
                   onChange={set('endDate')}
                   $hasError={!!fieldErrors.endDate}
                   aria-invalid={!!fieldErrors.endDate}
-                  aria-describedby={fieldErrors.endDate ? 'err-end' : undefined}
+                  aria-describedby={fieldErrors.endDate ? 'err-end' : 'hint-end'}
                 />
-                {fieldErrors.endDate && (
+                {fieldErrors.endDate ? (
                   <FieldError id="err-end" role="alert">{fieldErrors.endDate}</FieldError>
+                ) : (
+                  <FieldHint id="hint-end">Maturity / bullet-repayment date</FieldHint>
                 )}
               </Field>
             </Fields>
 
             <FormFooter>
               <Button type="submit" disabled={loading}>
+                {loading && <SpinnerIcon />}
                 {loading ? 'Running simulation…' : 'Run Simulation'}
               </Button>
             </FormFooter>
@@ -197,7 +249,7 @@ export function LoanSimulationPage() {
         )}
 
         {result && !loading && (
-          <>
+          <div ref={resultsRef}>
             <PreviewBanner role="note">
               <InfoIcon aria-hidden />
               <span>
@@ -248,7 +300,7 @@ export function LoanSimulationPage() {
                 Create Loan
               </Button>
             </CreateCta>
-          </>
+          </div>
         )}
       </Container>
 
@@ -289,6 +341,15 @@ function ErrorIcon({ className }: { className?: string }) {
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.75" />
       <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <SpinnerSvg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.3" />
+      <path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </SpinnerSvg>
   );
 }
 
@@ -368,12 +429,14 @@ const Label = styled.label`
   color: ${({ theme }) => theme.colors.textPrimary};
 `;
 
-const CurrencySuffix = styled.span`
+const CurrencyPrefix = styled.span<{ $hasError?: boolean }>`
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 0 ${({ theme }) => theme.radius.md} ${({ theme }) => theme.radius.md} 0;
+  border: 1px solid
+    ${({ $hasError, theme }) => ($hasError ? theme.colors.error : theme.colors.border)};
+  border-radius: ${({ theme }) => theme.radius.md} 0 0 ${({ theme }) => theme.radius.md};
+  border-right: none;
   background: ${({ theme }) => theme.colors.background};
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.fontSize.base};
@@ -386,11 +449,11 @@ const InputGroup = styled.div`
   display: flex;
   align-items: stretch;
 
-  &:focus-within ${CurrencySuffix} {
+  &:focus-within ${CurrencyPrefix} {
     border-color: ${({ theme }) => theme.colors.primary};
   }
 
-  &:has(input[aria-invalid='true']):focus-within ${CurrencySuffix} {
+  &:has(input[aria-invalid='true']) ${CurrencyPrefix} {
     border-color: ${({ theme }) => theme.colors.error};
   }
 `;
@@ -408,10 +471,10 @@ const Input = styled.input<{ $hasError?: boolean }>`
   font-size: ${({ theme }) => theme.typography.fontSize.base};
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  /* When rendered inside InputGroup the right radius is owned by the CurrencySuffix */
+  /* When rendered inside InputGroup the left radius is owned by the CurrencyPrefix */
   ${InputGroup} & {
-    border-radius: ${({ theme }) => theme.radius.md} 0 0 ${({ theme }) => theme.radius.md};
-    border-right: none;
+    border-radius: 0 ${({ theme }) => theme.radius.md} ${({ theme }) => theme.radius.md} 0;
+    border-left: none;
   }
 
   &::placeholder {
@@ -434,6 +497,31 @@ const FieldError = styled.span`
   font-size: ${({ theme }) => theme.typography.fontSize.xs};
   color: ${({ theme }) => theme.colors.error};
   line-height: ${({ theme }) => theme.typography.lineHeight.tight};
+`;
+
+const FieldHint = styled.span`
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  color: ${({ theme }) => theme.colors.textMuted};
+  line-height: ${({ theme }) => theme.typography.lineHeight.tight};
+`;
+
+const FormHint = styled.p`
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  line-height: ${({ theme }) => theme.typography.lineHeight.normal};
+  margin: 0 0 ${({ theme }) => theme.spacing.md};
+  padding-bottom: ${({ theme }) => theme.spacing.md};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+`;
+
+const SpinnerSvg = styled.svg`
+  flex-shrink: 0;
+  animation: sim-spin 0.75s linear infinite;
+
+  @keyframes sim-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
 `;
 
 const FormFooter = styled.div`
