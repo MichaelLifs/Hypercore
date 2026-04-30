@@ -194,17 +194,17 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
 
         {error && <ErrorMessage>{userFacingErrorMessage(error)}</ErrorMessage>}
 <Field>
-  <Label>
-    <Input 
+  <Label htmlFor="nonWorkDayPolicy">Payments on non-work days</Label>
+  <Input
     as="select"
     id="nonWorkDayPolicy"
     value={form.nonWorkDayPolicy}
-    onChange={set('nonWorkDayPolicy')}>
-         <option value="ALLOWED">Allowed</option>
+    onChange={set('nonWorkDayPolicy')}
+  >
+    <option value="ALLOWED">Allowed</option>
     <option value="MOVE_TO_PREVIOUS_WORK_DAY">Move to previous work day</option>
     <option value="MOVE_TO_NEXT_WORK_DAY">Move to next work day</option>
-    </Input>
-  </Label>
+  </Input>
 </Field>
         <Actions>
           <Button type="button" $variant="ghost" onClick={handleClose} disabled={loading}>

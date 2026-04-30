@@ -12,7 +12,6 @@ export function isNonWorkDay(iso:string) :boolean {
     return day ===0 || day === 6 ;
 }
 
-new Date("2026-01-01")
 
 export function adjustPaymentDate(iso:string, policy:nonWorkDayPolicy) :string {
 if(policy === 'ALLOWED' || !isNonWorkDay(iso)){ 
