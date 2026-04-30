@@ -22,6 +22,7 @@ import { runBackendTests } from '../../testing/runBackendTests';
 import { runFrontendTests } from '../../testing/runFrontendTests';
 import { roundMoney } from '../../utils/math';
 import type { FetchedPrimeRateSegment } from '../../domain/prime-rate/PrimeRateFetcher';
+import { nonWorkDayPolicy } from '../../domain/loan/nonWorkDayPolicy';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -78,6 +79,8 @@ function toCreateLoanInput(
       startDate: string;
       endDate: string;
       rateSegments?: FetchedPrimeRateSegment[] | null;
+      nonWorkDayPolicy ?:nonWorkDayPolicy | null;
+      
     };
   },
 ): CreateLoanInput {
@@ -88,6 +91,8 @@ function toCreateLoanInput(
     startDate: input.startDate,
     endDate: input.endDate,
     rateSegments: input.rateSegments ?? undefined,
+    nonWorkDayPolicy : input.nonWorkDayPolicy ?? undefined
+
   };
 }
 

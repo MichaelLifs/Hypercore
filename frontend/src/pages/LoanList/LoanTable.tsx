@@ -4,6 +4,10 @@ import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { format } from 'vitest/utils.js';
+
+
+
 
 export type LoanSortField =
   | 'CREATED_AT'
@@ -22,6 +26,7 @@ export interface LoanRow {
   endDate: string;
   createdAt: string;
   totalExpectedInterest: number;
+  nonWorkDayPolicy:string;
 }
 
 interface LoanTableProps {
@@ -128,6 +133,7 @@ export function LoanTable({
       <Table>
       <thead>
         <tr>
+          <Th>Non Work Day Policy</Th>
           <SortTh $active={sortBy === 'NAME'} $order={sortOrder} onClick={() => onSort('NAME')}>
             {SORT_LABEL.NAME}
           </SortTh>
@@ -161,6 +167,7 @@ export function LoanTable({
             onClick={() => navigate(`/loan/${loan.id}`)}
             $deleting={deletingId === loan.id}
           >
+            <TdPolicy>{formatNonWorkDayPolicy(loan.nonWorkDayPolicy)}</TdPolicy>
             <Td>{loan.name}</Td>
             <TdNumeric>{formatCurrency(loan.principal)}</TdNumeric>
             <Td>{formatDate(loan.startDate)}</Td>
@@ -244,6 +251,19 @@ export function LoanTable({
     </>
   );
 }
+
+
+function formatNonWorkDayPolicy(value: string): string {
+  const labels: Record<string, string> = {
+    ALLOWED: 'Allowed',
+    MOVE_TO_PREVIOUS_WORK_DAY: 'Previous work day',
+    MOVE_TO_NEXT_WORK_DAY: 'Next work day',
+  };
+
+  return labels[value] ?? 'Allowed';
+}
+
+
 
 const Table = styled.table`
   width: 100%;
@@ -341,6 +361,10 @@ const TdNumeric = styled(Td)`
   font-variant-numeric: tabular-nums;
   font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
   letter-spacing: -0.01em;
+`;
+
+const TdPolicy = styled(Td)`
+  font-weight: ${({ theme }) => theme.typography.fontWeight.semibold};
 `;
 
 const TdInterest = styled(TdNumeric)`

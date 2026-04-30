@@ -35,6 +35,7 @@ interface FormState {
   principal: string;
   startDate: string;
   endDate: string;
+  nonWorkDayPolicy:string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -42,6 +43,7 @@ const EMPTY_FORM: FormState = {
   principal: '',
   startDate: '',
   endDate: '',
+  nonWorkDayPolicy:'ALLOWED'
 };
 
 export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewLoanModalProps) {
@@ -62,7 +64,7 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
 
   const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    if (fieldErrors[field]) {
+    if (field !=='nonWorkDayPolicy' && fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
@@ -90,7 +92,9 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
             principal: Number(String(form.principal).replace(/,/g, '')),
             startDate: form.startDate,
             endDate: form.endDate,
+            nonWorkDayPolicy : form.nonWorkDayPolicy,
             ...(matchesSeed ? { rateSegments: seededSegments } : {}),
+
           },
         },
       });
@@ -189,7 +193,19 @@ export function NewLoanModal({ isOpen, onClose, onCreated, initialValues }: NewL
         </Row>
 
         {error && <ErrorMessage>{userFacingErrorMessage(error)}</ErrorMessage>}
-
+<Field>
+  <Label>
+    <Input 
+    as="select"
+    id="nonWorkDayPolicy"
+    value={form.nonWorkDayPolicy}
+    onChange={set('nonWorkDayPolicy')}>
+         <option value="ALLOWED">Allowed</option>
+    <option value="MOVE_TO_PREVIOUS_WORK_DAY">Move to previous work day</option>
+    <option value="MOVE_TO_NEXT_WORK_DAY">Move to next work day</option>
+    </Input>
+  </Label>
+</Field>
         <Actions>
           <Button type="button" $variant="ghost" onClick={handleClose} disabled={loading}>
             Cancel

@@ -15,7 +15,7 @@ const migrationsExt = __filename.endsWith('.ts') ? 'ts' : 'js';
 export const AppDataSource = new DataSource({
   type: 'better-sqlite3',
   database: dbPath,
-  synchronize: false,
+  synchronize: true,
   migrationsRun: true,
   logging: process.env.NODE_ENV === 'development',
   entities: [Loan, LoanRateSegment, RepaymentEntry],

@@ -44,6 +44,7 @@ export const GET_LOANS = gql`
         endDate
         createdAt
         totalExpectedInterest
+        nonWorkDayPolicy
       }
       total
       page
@@ -76,6 +77,7 @@ export const CREATE_LOAN = gql`
       startDate
       endDate
       totalExpectedInterest
+      nonWorkDayPolicy
     }
   }
 `;

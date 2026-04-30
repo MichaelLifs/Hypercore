@@ -8,6 +8,9 @@ import {
 } from 'typeorm';
 import { LoanRateSegment } from '../prime-rate/LoanRateSegment.entity';
 import { RepaymentEntry } from '../repayment/RepaymentEntry.entity';
+import { DEFAULT_NON_WORK_DAY_POLICY } from './nonWorkDayPolicy';
+import { nonWorkDayPolicy } from './nonWorkDayPolicy';
+
 
 @Entity('loans')
 @Index('idx_loan_end_date', ['endDate'])
@@ -27,6 +30,9 @@ export class Loan {
 
   @Column('text')
   endDate!: string;
+
+ @Column('text', { default: DEFAULT_NON_WORK_DAY_POLICY })
+ nonWorkDayPolicy!: nonWorkDayPolicy;
 
   @CreateDateColumn()
   createdAt!: Date;

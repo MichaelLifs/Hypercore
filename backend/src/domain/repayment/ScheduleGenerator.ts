@@ -9,6 +9,10 @@ import {
   type DayCount30360Options,
 } from './dayCount30360';
 import type { RateSegment, ScheduleEntry } from './repayment.types';
+import { DEFAULT_NON_WORK_DAY_POLICY,  } from '../loan/nonWorkDayPolicy';
+import { nonWorkDayPolicy } from '../loan/nonWorkDayPolicy';
+
+import { adjustPaymentDate } from './workDays';
 
 function dayCountOpts(endDate: string): DayCount30360Options {
   return { loanMaturityDate: endDate };
@@ -145,6 +149,7 @@ export function generateSchedule(
   startDate: string,
   endDate: string,
   rateSegments: RateSegment[],
+  nonWorkDayPolicy : nonWorkDayPolicy = DEFAULT_NON_WORK_DAY_POLICY,
 ): ScheduleEntry[] {
   if (!Number.isFinite(principal) || principal <= 0) {
     throw new RangeError('principal must be a finite positive amount');
@@ -174,13 +179,14 @@ export function generateSchedule(
     const isMaturity = compareIso(payDate, endDate) === 0;
     const interestRaw = interestAccrued(principal, cursor, payDate, rateSegments, endDate);
     const interest = roundMoney(interestRaw);
+    const adjustedPayDate = adjustPaymentDate(payDate,nonWorkDayPolicy)
 
     if (isMaturity) {
       const principalPaid = roundMoney(principal);
       const total = roundMoney(principalPaid + interest);
       entries.push({
         sequenceNumber: seq++,
-        paymentDate: payDate,
+        paymentDate:adjustedPayDate,
         paymentType: 'PRINCIPAL_AND_INTEREST',
         principal: principalPaid,
         interest,
@@ -191,7 +197,7 @@ export function generateSchedule(
       const total = roundMoney(interest);
       entries.push({
         sequenceNumber: seq++,
-        paymentDate: payDate,
+        paymentDate:adjustedPayDate,
         paymentType: 'INTEREST',
         principal: 0,
         interest,

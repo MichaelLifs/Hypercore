@@ -8,14 +8,18 @@ import { RepaymentEntry } from '../repayment/RepaymentEntry.entity';
 import { fetchPrimeRateSegments, FetchedPrimeRateSegment } from '../prime-rate/PrimeRateFetcher';
 import { roundMoney } from '../../utils/math';
 import type { ScheduleEntry } from '../repayment/repayment.types';
+import { DEFAULT_NON_WORK_DAY_POLICY } from './nonWorkDayPolicy';
+import type { nonWorkDayPolicy } from './nonWorkDayPolicy';
 
 export interface CreateLoanInput {
   name: string;
   principal: number;
   startDate: string;
   endDate: string;
+  nonWorkDayPolicy?:nonWorkDayPolicy;
   /** Snapshot returned by a prior simulateLoan; pinned to reproduce the preview exactly. */
   rateSegments?: FetchedPrimeRateSegment[];
+  
 }
 
 export interface PaginatedLoans {
@@ -157,6 +161,8 @@ export interface SimulateLoanInput {
   principal: number;
   startDate: string;
   endDate: string;
+  nonWorkDayPolicy?:nonWorkDayPolicy;
+
 }
 
 export interface LoanSimulationResult {
@@ -177,6 +183,7 @@ async function buildLoanScheduleData(
   principal: number,
   startDate: string,
   endDate: string,
+  nonWorkDayPolicy : nonWorkDayPolicy,
   providedSegments?: FetchedPrimeRateSegment[],
 ): Promise<{
   schedule: ScheduleEntry[];
@@ -189,21 +196,29 @@ async function buildLoanScheduleData(
     effectiveFrom: seg.effectiveFrom,
     annualRate: seg.annualRate,
   }));
-  const schedule = generateSchedule(principal, startDate, endDate, rateSegmentsForGenerator);
+  const schedule = generateSchedule(principal, startDate, endDate, rateSegmentsForGenerator,nonWorkDayPolicy);
   const totalExpectedInterest = roundMoney(
     schedule.reduce((sum, entry) => sum + entry.interest, 0),
   );
   return { schedule, totalExpectedInterest, rateSegments };
 }
 
+
+function normalizeNonWorkDayPolicy(policy?: nonWorkDayPolicy | null): nonWorkDayPolicy {
+  return policy ?? DEFAULT_NON_WORK_DAY_POLICY;
+}
+
+
 export async function simulateLoan(input: SimulateLoanInput): Promise<LoanSimulationResult> {
   assertValidPrincipal(input.principal);
   assertValidLoanDates(input.startDate, input.endDate);
-
-  const { schedule, totalExpectedInterest, rateSegments } = await buildLoanScheduleData(
+const nonWorkDayPolicy = normalizeNonWorkDayPolicy(input.nonWorkDayPolicy);
+  const { schedule, totalExpectedInterest, rateSegments,} = await buildLoanScheduleData(
     input.principal,
     input.startDate,
     input.endDate,
+    nonWorkDayPolicy
+    
   );
 
   return {
@@ -235,12 +250,14 @@ export function setPrecomputedInterest(loan: Loan, value: number): void {
 // creation; schedule reads never re-fetch from FRED.
 export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   assertValidCreateLoanInput(input);
-
+const nonWorkDayPolicy = normalizeNonWorkDayPolicy(input.nonWorkDayPolicy);
   const { schedule, totalExpectedInterest, rateSegments } = await buildLoanScheduleData(
     input.principal,
     input.startDate,
     input.endDate,
+    nonWorkDayPolicy,
     input.rateSegments,
+    
   );
 
   const loan = await AppDataSource.transaction(async (em) => {
@@ -249,6 +266,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
       principal: input.principal,
       startDate: input.startDate,
       endDate: input.endDate,
+      nonWorkDayPolicy,
     });
     await em.save(saved);
 
